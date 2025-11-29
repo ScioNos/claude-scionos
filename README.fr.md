@@ -181,6 +181,36 @@ claude --version
 
 ---
 
+#### Windows : Git Bash introuvable
+
+**Problème :** Sur Windows, Claude Code nécessite git-bash pour fonctionner. Si vous voyez une erreur après avoir saisi votre jeton, ou si `claude-scionos` se ferme avec un avertissement Git Bash, c'est le problème.
+
+**Solution :**
+
+1. **Installer Git pour Windows** (inclut Git Bash) :
+
+   Télécharger depuis : [https://git-scm.com/downloads/win](https://git-scm.com/downloads/win)
+
+2. **Alternative :** Si Git Bash est déjà installé mais non détecté, définissez la variable d'environnement :
+
+   ```bash
+   # Invite de commandes Windows
+   set CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe
+
+   # PowerShell Windows
+   $env:CLAUDE_CODE_GIT_BASH_PATH="C:\Program Files\Git\bin\bash.exe"
+   ```
+
+3. **Redémarrez votre terminal** et relancez :
+
+   ```bash
+   npx claude-scionos
+   ```
+
+**Note :** Git Bash est automatiquement inclus lors de l'installation de Git pour Windows. Après l'installation, `claude-scionos` le détectera automatiquement.
+
+---
+
 #### Échec de l'authentification du jeton
 
 **Problème :** Jeton invalide ou expiré.

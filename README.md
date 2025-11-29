@@ -181,6 +181,36 @@ claude --version
 
 ---
 
+#### Windows: Git Bash not found
+
+**Problem:** On Windows, Claude Code requires git-bash to run. If you see an error after entering your token, or if `claude-scionos` exits with a Git Bash warning, this is the issue.
+
+**Solution:**
+
+1. **Install Git for Windows** (includes Git Bash):
+
+   Download from: [https://git-scm.com/downloads/win](https://git-scm.com/downloads/win)
+
+2. **Alternative:** If Git Bash is already installed but not detected, set the environment variable:
+
+   ```bash
+   # Windows Command Prompt
+   set CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe
+
+   # Windows PowerShell
+   $env:CLAUDE_CODE_GIT_BASH_PATH="C:\Program Files\Git\bin\bash.exe"
+   ```
+
+3. **Restart your terminal** and run again:
+
+   ```bash
+   npx claude-scionos
+   ```
+
+**Note:** Git Bash is automatically included when you install Git for Windows. After installation, `claude-scionos` will detect it automatically.
+
+---
+
 #### Token authentication fails
 
 **Problem:** Invalid or expired token.

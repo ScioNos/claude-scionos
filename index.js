@@ -6,6 +6,7 @@ import spawn from 'cross-spawn';
 import which from 'which';
 import process from 'node:process';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
@@ -24,14 +25,35 @@ try {
     process.exit(1);
 }
 
-// 2. Intro
+// 2. Check Git Bash on Windows
+if (process.platform === 'win32') {
+    const possiblePaths = [
+        process.env.CLAUDE_CODE_GIT_BASH_PATH,
+        'C:\\Program Files\\Git\\bin\\bash.exe',
+        'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+    ].filter(Boolean);
+
+    const gitBashFound = possiblePaths.some(path => fs.existsSync(path));
+
+    if (!gitBashFound) {
+        console.log(chalk.red('\n❌ Git Bash is required on Windows\n'));
+        console.log(chalk.cyan('📥 Install Git for Windows:'));
+        console.log(chalk.white('   https://git-scm.com/downloads/win\n'));
+        console.log(chalk.cyan('⚙️  Or set the path manually:'));
+        console.log(chalk.white('   CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe\n'));
+        console.log(chalk.yellow('💡 After installation, restart your terminal and try again.\n'));
+        process.exit(1);
+    }
+}
+
+// 3. Intro
 console.clear();
 console.log(chalk.cyan.bold("Claude Code (via ScioNos)"));
 
-// 3. Token info
+// 4. Token info
 console.log(chalk.blueBright("To retrieve your token, visit: https://hubs02225.snia.ch/console/token"));
 
-// 4. Token input
+// 5. Token input
 const token = await password({
     message: "Please enter your ANTHROPIC_AUTH_TOKEN:",
     validate: (input) => {
@@ -43,7 +65,7 @@ const token = await password({
     mask: '*'
 });
 
-// 5. Environment configuration
+// 6. Environment configuration
 const env = {
     ...process.env,
     ANTHROPIC_BASE_URL: "https://hubs02225.snia.ch",
@@ -51,7 +73,7 @@ const env = {
     ANTHROPIC_API_KEY: "" // Force empty string
 };
 
-// 6. Launch Claude Code
+// 7. Launch Claude Code
 const child = spawn('claude', [], {
     stdio: 'inherit',
     env: env
