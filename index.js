@@ -3,6 +3,7 @@
 import chalk from 'chalk';
 import { password } from '@inquirer/prompts';
 import spawn from 'cross-spawn';
+import updateNotifier from 'update-notifier';
 import which from 'which';
 import process from 'node:process';
 import { createRequire } from 'node:module';
@@ -10,6 +11,9 @@ import fs from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
+
+// Initialize update notifier
+updateNotifier({ pkg }).notify();
 
 // 0. Handle --version / -v flag
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
@@ -20,7 +24,7 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
 // 1. Check if "claude" command is available
 try {
     await which('claude');
-} catch (error) {
+} catch {
     console.error(chalk.redBright("Error: 'claude' command not found. Please install Claude Code first: npm install -g @anthropic-ai/claude-code"));
     process.exit(1);
 }
@@ -51,7 +55,7 @@ console.clear();
 console.log(chalk.cyan.bold("Claude Code (via ScioNos)"));
 
 // 4. Token info
-console.log(chalk.blueBright("To retrieve your token, visit: https://hubs02225.snia.ch/console/token"));
+console.log(chalk.blueBright("To retrieve your token, visit: https://routerlab.ch/keys"));
 
 // 5. Token input
 const token = await password({
@@ -68,13 +72,14 @@ const token = await password({
 // 6. Environment configuration
 const env = {
     ...process.env,
-    ANTHROPIC_BASE_URL: "https://hubs02225.snia.ch",
+    ANTHROPIC_BASE_URL: "https://routerlab.ch",
     ANTHROPIC_AUTH_TOKEN: token,
     ANTHROPIC_API_KEY: "" // Force empty string
 };
 
 // 7. Launch Claude Code
-const child = spawn('claude', [], {
+const args = process.argv.slice(2);
+const child = spawn('claude', args, {
     stdio: 'inherit',
     env: env
 });

@@ -60,7 +60,7 @@ Before using `claude-scionos`, ensure you have:
   npm install -g @anthropic-ai/claude-code
   ```
 
-- A valid **ANTHROPIC_AUTH_TOKEN** from [https://hubs02225.snia.ch/console/token](https://hubs02225.snia.ch/console/token)
+- A valid **ANTHROPIC_AUTH_TOKEN** from [https://routerlab.ch/keys](https://routerlab.ch/keys)
 
 ---
 
@@ -113,7 +113,7 @@ npx claude-scionos
 $ npx claude-scionos
 
 Claude Code (via ScioNos)
-To retrieve your token, visit: https://hubs02225.snia.ch/console/token
+To retrieve your token, visit: https://routerlab.ch/keys
 ? Please enter your ANTHROPIC_AUTH_TOKEN: ********
 
 # Claude Code starts...
@@ -134,7 +134,7 @@ npx claude-scionos -v
 1. **Verification**: Checks if `claude` command is available in your PATH
 2. **Token Input**: Securely prompts for your authentication token (masked input)
 3. **Environment Setup**: Creates isolated environment variables:
-   - `ANTHROPIC_BASE_URL` → `https://hubs02225.snia.ch`
+   - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
    - `ANTHROPIC_AUTH_TOKEN` → Your token (memory only)
 4. **Execution**: Spawns Claude Code process with custom environment
 5. **Cleanup**: Automatically destroys credentials on exit
@@ -157,7 +157,7 @@ While `claude-scionos` ensures maximum security by keeping tokens in memory only
 ✅ **Best Practices:**
 
 - Never share your `ANTHROPIC_AUTH_TOKEN` with others
-- Retrieve a fresh token for each session from [https://hubs02225.snia.ch/console/token](https://hubs02225.snia.ch/console/token)
+- Retrieve a fresh token for each session from [https://routerlab.ch/keys](https://routerlab.ch/keys)
 - Avoid running on shared/untrusted systems
 - Use for local development or secure CI/CD pipelines
 
@@ -216,9 +216,9 @@ claude --version
 **Problem:** Invalid or expired token.
 
 **Solution:**
-1. Get a fresh token from [https://hubs02225.snia.ch/console/token](https://hubs02225.snia.ch/console/token)
+1. Get a fresh token from [https://routerlab.ch/keys](https://routerlab.ch/keys)
 2. Ensure you're copying the complete token (no extra spaces)
-3. Check your network connection to `hubs02225.snia.ch`
+3. Check your network connection to `routerlab.ch`
 
 ---
 

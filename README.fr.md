@@ -60,7 +60,7 @@ Avant d'utiliser `claude-scionos`, assurez-vous d'avoir :
   npm install -g @anthropic-ai/claude-code
   ```
 
-- Un **ANTHROPIC_AUTH_TOKEN** valide depuis [https://hubs02225.snia.ch/console/token](https://hubs02225.snia.ch/console/token)
+- Un **ANTHROPIC_AUTH_TOKEN** valide depuis [https://routerlab.ch/keys](https://routerlab.ch/keys)
 
 ---
 
@@ -113,7 +113,7 @@ npx claude-scionos
 $ npx claude-scionos
 
 Claude Code (via ScioNos)
-To retrieve your token, visit: https://hubs02225.snia.ch/console/token
+To retrieve your token, visit: https://routerlab.ch/keys
 ? Please enter your ANTHROPIC_AUTH_TOKEN: ********
 
 # Claude Code démarre...
@@ -134,7 +134,7 @@ npx claude-scionos -v
 1. **Vérification** : Vérifie que la commande `claude` est disponible dans votre PATH
 2. **Saisie du jeton** : Demande de manière sécurisée votre jeton d'authentification (entrée masquée)
 3. **Configuration de l'environnement** : Crée des variables d'environnement isolées :
-   - `ANTHROPIC_BASE_URL` → `https://hubs02225.snia.ch`
+   - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
    - `ANTHROPIC_AUTH_TOKEN` → Votre jeton (mémoire uniquement)
 4. **Exécution** : Lance le processus Claude Code avec l'environnement personnalisé
 5. **Nettoyage** : Détruit automatiquement les informations d'identification à la sortie
@@ -157,7 +157,7 @@ Bien que `claude-scionos` assure une sécurité maximale en conservant les jeton
 ✅ **Bonnes pratiques :**
 
 - Ne partagez jamais votre `ANTHROPIC_AUTH_TOKEN` avec d'autres personnes
-- Récupérez un nouveau jeton pour chaque session depuis [https://hubs02225.snia.ch/console/token](https://hubs02225.snia.ch/console/token)
+- Récupérez un nouveau jeton pour chaque session depuis [https://routerlab.ch/keys](https://routerlab.ch/keys)
 - Évitez d'exécuter sur des systèmes partagés/non fiables
 - Utilisez pour le développement local ou des pipelines CI/CD sécurisés
 
@@ -216,9 +216,9 @@ claude --version
 **Problème :** Jeton invalide ou expiré.
 
 **Solution :**
-1. Obtenez un nouveau jeton depuis [https://hubs02225.snia.ch/console/token](https://hubs02225.snia.ch/console/token)
+1. Obtenez un nouveau jeton depuis [https://routerlab.ch/keys](https://routerlab.ch/keys)
 2. Assurez-vous de copier le jeton complet (sans espaces supplémentaires)
-3. Vérifiez votre connexion réseau à `hubs02225.snia.ch`
+3. Vérifiez votre connexion réseau à `routerlab.ch`
 
 ---
 
