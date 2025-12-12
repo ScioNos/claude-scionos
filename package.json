@@ -1,6 +1,6 @@
 {
     "name": "claude-scionos",
-    "version": "1.1.0",
+    "version": "2.0.0",
     "description": "Ephemeral and secure runner for Claude Code CLI in SNIA environment",
     "type": "module",
     "main": "index.js",

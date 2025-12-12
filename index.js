@@ -4,10 +4,9 @@ import chalk from 'chalk';
 import { password } from '@inquirer/prompts';
 import spawn from 'cross-spawn';
 import updateNotifier from 'update-notifier';
-import which from 'which';
 import process from 'node:process';
 import { createRequire } from 'node:module';
-import fs from 'node:fs';
+import { isClaudeCodeInstalled, detectOS, checkGitBashOnWindows, getInstallationInstructions } from './src/detectors/claude-only.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
@@ -21,38 +20,62 @@ if (process.argv.includes('--version') || process.argv.includes('-v')) {
     process.exit(0);
 }
 
-// 1. Check if "claude" command is available
-try {
-    await which('claude');
-} catch {
-    console.error(chalk.redBright("Error: 'claude' command not found. Please install Claude Code first: npm install -g @anthropic-ai/claude-code"));
+// 1. Enhanced System Detection
+console.log(chalk.cyan('🔍 Checking system configuration...'));
+
+// Detect OS and environment
+const osInfo = detectOS();
+console.log(chalk.gray(`✓ OS: ${osInfo.type} (${osInfo.arch})`));
+console.log(chalk.gray(`✓ Shell: ${osInfo.shell}`));
+
+// Check Claude Code installation
+const claudeStatus = isClaudeCodeInstalled();
+
+if (!claudeStatus.installed) {
+    console.error(chalk.redBright('\n❌ Claude Code not found'));
+
+    // Show detailed detection info
+    console.log(chalk.yellow('\nDetection Details:'));
+    console.log(chalk.gray(claudeStatus.details));
+
+    // Show installation instructions
+    const instructions = getInstallationInstructions(osInfo, claudeStatus);
+    console.log(chalk.cyan(instructions));
+
     process.exit(1);
 }
 
-// 2. Check Git Bash on Windows
+// Show Claude Code status
+console.log(chalk.green('\n✓ Claude Code detected'));
+console.log(chalk.gray(claudeStatus.details));
+
+// 2. Check Git Bash on Windows (if needed)
 if (process.platform === 'win32') {
-    const possiblePaths = [
-        process.env.CLAUDE_CODE_GIT_BASH_PATH,
-        'C:\\Program Files\\Git\\bin\\bash.exe',
-        'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-    ].filter(Boolean);
+    console.log(chalk.cyan('\n🔍 Checking Git Bash availability...'));
+    const gitBashStatus = checkGitBashOnWindows();
 
-    const gitBashFound = possiblePaths.some(path => fs.existsSync(path));
+    if (!gitBashStatus.available) {
+        console.log(chalk.red('\n❌ Git Bash is required on Windows'));
+        console.log(chalk.gray(gitBashStatus.message));
 
-    if (!gitBashFound) {
-        console.log(chalk.red('\n❌ Git Bash is required on Windows\n'));
-        console.log(chalk.cyan('📥 Install Git for Windows:'));
+        // Show Git Bash installation instructions
+        console.log(chalk.cyan('\n📥 Install Git for Windows:'));
         console.log(chalk.white('   https://git-scm.com/downloads/win\n'));
         console.log(chalk.cyan('⚙️  Or set the path manually:'));
-        console.log(chalk.white('   CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe\n'));
+        console.log(chalk.white('   set CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe'));
+        console.log(chalk.white('   (PowerShell: $env:CLAUDE_CODE_GIT_BASH_PATH="C:\\Program Files\\Git\\bin\\bash.exe")\n'));
         console.log(chalk.yellow('💡 After installation, restart your terminal and try again.\n'));
         process.exit(1);
+    } else {
+        console.log(chalk.green('✓ Git Bash available'));
+        console.log(chalk.gray(gitBashStatus.message));
     }
 }
 
 // 3. Intro
 console.clear();
 console.log(chalk.cyan.bold("Claude Code (via ScioNos)"));
+console.log(chalk.gray(`Running on ${osInfo.type} with ${osInfo.shell}`));
 
 // 4. Token info
 console.log(chalk.blueBright("To retrieve your token, visit: https://routerlab.ch/keys"));
