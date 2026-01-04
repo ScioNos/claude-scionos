@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 - Ephemeral and secure token handling (memory-only storage)
-- Support for ScioNos environment (`https://hubs02225.snia.ch`)
+- Support for ScioNos environment (`https://routerlab.ch`)
 - Bilingual documentation (English and French)
 - Command-line interface with `--version` flag
 - Secure token input with masking
