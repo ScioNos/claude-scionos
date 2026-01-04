@@ -34,7 +34,7 @@ _[🇫🇷 Lire en français](./README.fr.md)_
 
 **claude-scionos** is an ephemeral and secure runner for the official [Claude Code](https://github.com/anthropics/claude-code) CLI. It initializes all required environment variables **directly in memory**, ensuring that no configuration files or authentication data are ever written to disk.
 
-The goal is to offer a clean, isolated, and professional execution layer fully compatible with Claude Code, specifically designed for the **SNIA environment**.
+The goal is to offer a clean, isolated, and professional execution layer fully compatible with Claude Code, specifically designed for the **ScioNos environment**.
 
 ---
 

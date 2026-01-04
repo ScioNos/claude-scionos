@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-claude-scionos is a lightweight Node.js CLI wrapper that provides ephemeral and secure execution of the official Claude Code CLI. It's designed for the SNIA environment and focuses on in-memory credential management with zero disk persistence.
+claude-scionos is a lightweight Node.js CLI wrapper that provides ephemeral and secure execution of the official Claude Code CLI. It's designed for the ScioNos environment and focuses on in-memory credential management with zero disk persistence.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ The project is a single-file Node.js application (`index.js`) that:
 2. **Windows-specific check**: Verifies Git Bash installation (required by Claude Code on Windows)
 3. **Secure token collection**: Uses `@inquirer/prompts` for masked password input
 4. **Environment isolation**: Creates isolated environment variables with:
-   - `ANTHROPIC_BASE_URL`: Set to `https://routerlab.ch` (hardcoded SNIA endpoint)
+   - `ANTHROPIC_BASE_URL`: Set to `https://routerlab.ch` (hardcoded ScioNos endpoint)
    - `ANTHROPIC_AUTH_TOKEN`: User-provided token (memory only)
    - `ANTHROPIC_API_KEY`: Explicitly set to empty string
 5. **Process spawning**: Launches Claude Code CLI with inherited stdio and custom environment
@@ -77,7 +77,7 @@ Currently no automated tests are configured. When implementing tests, focus on:
 
 ## Important Constants
 
-- `ANTHROPIC_BASE_URL`: `"https://routerlab.ch"` (SNIA-specific endpoint)
+- `ANTHROPIC_BASE_URL`: `"https://routerlab.ch"` (ScioNos-specific endpoint)
 - Minimum Node.js version: 22
 - Package entry point: `index.js` with shebang for direct execution
 
