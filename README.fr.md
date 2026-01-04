@@ -127,6 +127,18 @@ npx claude-scionos --version
 npx claude-scionos -v
 ```
 
+#### Compatibilité totale avec Claude Code
+
+**`claude-scionos` est un wrapper transparent** — il accepte **tous les flags et commandes** supportés par la CLI officielle Claude Code.
+
+Vous pouvez utiliser n'importe quel flag ou commande Claude Code, comme :
+- `npx claude-scionos --model opus "expliquer ce code"`
+- `npx claude-scionos --verbose --continue`
+- `npx claude-scionos -p --output-format json "requête"`
+- `npx claude-scionos --chrome --agents '{"reviewer":{...}}'`
+
+Pour une liste complète des flags et commandes disponibles, consultez la [documentation officielle de la CLI Claude Code](https://code.claude.com/docs/cli-reference).
+
 ---
 
 ### 🔍 Fonctionnement
