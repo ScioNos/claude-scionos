@@ -35,7 +35,7 @@ function isClaudeCodeInstalled() {
           details.push(`ℹ Claude Code installed but not configured`);
         }
       } catch (error) {
-        details.push(`⚠ Could not read configuration file`);
+        details.push(`⚠ Could not read configuration file: ${error.message}`);
       }
 
       return {
@@ -63,7 +63,7 @@ function isClaudeCodeInstalled() {
         const version = execSync('claude --version', { encoding: 'utf8' }).trim();
         details.push(`✓ Version: ${version}`);
       } catch (error) {
-        details.push(`⚠ CLI found but version check failed`);
+        details.push(`⚠ CLI found but version check failed: ${error.message}`);
       }
 
       return {
@@ -78,7 +78,7 @@ function isClaudeCodeInstalled() {
       };
     }
   } catch (error) {
-    details.push(`✗ Claude CLI not found in PATH`);
+    details.push(`✗ Claude CLI not found in PATH: ${error.message}`);
   }
 
   return {
@@ -180,10 +180,9 @@ function checkGitBashOnWindows() {
 /**
  * Provides installation instructions based on OS and current state
  * @param {Object} osInfo - OS detection result
- * @param {Object} claudeStatus - Claude Code detection result
  * @returns {string} Installation instructions
  */
-function getInstallationInstructions(osInfo, claudeStatus) {
+function getInstallationInstructions(osInfo) {
   let instructions = [];
 
   if (osInfo.type === 'Windows') {
