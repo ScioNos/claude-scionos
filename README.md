@@ -54,13 +54,9 @@ The goal is to offer a clean, isolated, and professional execution layer fully c
 Before using `claude-scionos`, ensure you have:
 
 - **Node.js** version 22 or later ([Download](https://nodejs.org/))
-- **Claude Code** CLI installed globally:
-
-  ```bash
-  npm install -g @anthropic-ai/claude-code
-  ```
-
 - A valid **ANTHROPIC_AUTH_TOKEN** from [https://routerlab.ch/keys](https://routerlab.ch/keys)
+
+*(Note: If **Claude Code** is not installed, the tool will offer to install it for you automatically.)*
 
 ---
 
@@ -102,7 +98,7 @@ npx claude-scionos
 
 **What happens:**
 
-1.  Checks if Claude Code CLI is installed
+1.  Checks if Claude Code CLI is installed (if not, offers **automatic installation**)
 2.  Prompts for your `ANTHROPIC_AUTH_TOKEN`
 3.  Launches Claude Code with token stored **in memory only**
 4.  Automatically cleans credentials on exit

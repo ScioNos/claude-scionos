@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
+import path from 'path';
 import child_process from 'child_process';
 import { isClaudeCodeInstalled, detectOS, checkGitBashOnWindows } from '../src/detectors/claude-only.js';
 
@@ -78,8 +79,7 @@ describe('System Detectors', () => {
     it('should detect Claude in PATH', () => {
         // Mock homedir to avoid finding config file
         vi.mocked(os.homedir).mockReturnValue('/home/user');
-        vi.mocked(fs.existsSync).mockReturnValue(false);
-
+        
         // Mock execSync to return a path
         vi.mocked(child_process.execSync).mockImplementation((cmd) => {
             if (cmd.includes('which claude') || cmd.includes('where claude')) {
@@ -91,13 +91,19 @@ describe('System Detectors', () => {
             return '';
         });
 
+        // Mock existsSync: false for config, true for CLI path
+        vi.mocked(fs.existsSync).mockImplementation((p) => {
+             if (p === '/usr/local/bin/claude') return true;
+             return false;
+        });
+
         const result = isClaudeCodeInstalled();
         expect(result.installed).toBe(true);
         expect(result.cliAvailable).toBe(true);
         expect(result.cliPath).toBe('/usr/local/bin/claude');
     });
 
-    it('should detect Claude from config file', () => {
+    it('should detect Claude from config file ONLY if CLI is also found', () => {
         vi.mocked(os.homedir).mockReturnValue('/home/user');
         // Simulate .claude directory and settings.json existence
         vi.mocked(fs.existsSync).mockImplementation((p) => {
@@ -111,9 +117,39 @@ describe('System Detectors', () => {
             env: { ANTHROPIC_BASE_URL: 'https://api.anthropic.com' }
         }));
 
+        // BUT execSync fails (CLI not found)
+        vi.mocked(child_process.execSync).mockImplementation(() => {
+            throw new Error('not found');
+        });
+
+        const result = isClaudeCodeInstalled();
+        // Updated logic: installed should be false if CLI is missing, even if config exists
+        expect(result.installed).toBe(false);
+        expect(result.configFound).toBe(true);
+        expect(result.cliAvailable).toBe(false);
+        expect(result.details).toContain('Executable \'claude\' not found');
+    });
+
+    it('should detect Claude in native path (Linux/Mac)', () => {
+        // Force Linux platform to ensure implementation looks for 'claude' not 'claude.exe'
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+
+        // We simulate logic but path.join will use OS separators.
+        // On Windows, path.join produces backslashes.
+        // The code under test uses path.join.
+        const mockHome = '/home/user';
+        const expectedPath = path.join(mockHome, '.local', 'bin', 'claude');
+        
+        vi.mocked(os.homedir).mockReturnValue(mockHome);
+        
+        // Simulate native path existence
+        vi.mocked(fs.existsSync).mockImplementation((p) => {
+            return p === expectedPath;
+        });
+
         const result = isClaudeCodeInstalled();
         expect(result.installed).toBe(true);
-        expect(result.details).toContain('Configuration file found');
+        expect(result.cliPath).toBe(expectedPath);
     });
 
     it('should return false if neither CLI nor config found', () => {

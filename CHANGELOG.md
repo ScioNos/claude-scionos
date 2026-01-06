@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-01-06
+
+### Added
+- **Auto-Installation**: Prompts users to automatically install Claude Code CLI (`npm install -g`) if missing.
+- **Native Path Detection**: Now detects Claude Code installations in native paths (`~/.local/bin`, Windows Apps, etc.) per official docs.
+- **SIGTERM Support**: Added handling for `SIGTERM` signals (Docker, CI/CD) to cleanly stop the child process.
+
+### Fixed
+- **Crash on Config-Only**: Fixed a critical bug where the wrapper would crash if a configuration file existed but the CLI executable was missing.
+- **Recursion Safety**: Now launches the detected absolute path of the executable instead of the generic command name, preventing potential loop issues.
+- **Error Logging**: Errors are now correctly sent to `stderr` instead of `stdout`.
+
 ## [2.1.0] - 2026-01-06
 
 ### Added

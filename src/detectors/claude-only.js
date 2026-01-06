@@ -13,81 +13,68 @@ function isClaudeCodeInstalled() {
   const claudeDir = path.join(os.homedir(), '.claude');
   const details = [];
 
+  // 1. Check for Configuration
+  let configFound = false;
   if (fs.existsSync(claudeDir)) {
-    details.push(`✓ Found Claude directory: ${claudeDir}`);
-
-    // Check for settings.json to confirm it's actually Claude Code
     const settingsPath = path.join(claudeDir, 'settings.json');
     if (fs.existsSync(settingsPath)) {
-      details.push(`✓ Configuration file found: ${settingsPath}`);
-
-      // Try to read the config to see if it's configured
-      try {
-        const config = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-        const hasBaseUrl = config.env?.ANTHROPIC_BASE_URL;
-        const hasApiKey = config.env?.ANTHROPIC_API_KEY;
-
-        if (hasBaseUrl && hasApiKey) {
-          details.push(`✓ Claude Code is configured with custom API`);
-        } else if (hasBaseUrl || hasApiKey) {
-          details.push(`⚠ Claude Code is partially configured`);
-        } else {
-          details.push(`ℹ Claude Code installed but not configured`);
-        }
-      } catch (error) {
-        details.push(`⚠ Could not read configuration file: ${error.message}`);
-      }
-
-      return {
-        installed: true,
-        path: claudeDir,
-        configPath: settingsPath,
-        cliAvailable: false, // Will check next
-        details: details.join('\n  ')
-      };
-    } else {
-      details.push(`⚠ Directory exists but no settings.json found`);
+      configFound = true;
+      details.push(`✓ Configuration found at: ${settingsPath}`);
     }
   }
 
-  // Also check for the claude CLI command in PATH
-  try {
-    const command = process.platform === 'win32' ? 'where claude' : 'which claude';
-    const output = execSync(command, { encoding: 'utf8' });
-    // On Windows 'where' can return multiple paths, take the first one
-    const claudePath = output.split(/\r?\n/)[0].trim();
+  // 2. Check for Executable (CLI)
+  let cliPath = null;
 
-    if (claudePath) {
-      details.push(`✓ Claude CLI found in PATH: ${claudePath}`);
+  // 2a. Check Native Install Paths (per official docs)
+  const home = os.homedir();
+  const nativePaths = process.platform === 'win32' 
+    ? [path.join(home, '.local', 'bin', 'claude.exe'), path.join(home, 'AppData', 'Local', 'Microsoft', 'WindowsApps', 'claude.exe')]
+    : [path.join(home, '.local', 'bin', 'claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'];
 
-      // Try to get version to confirm it's working
-      try {
-        const version = execSync('claude --version', { encoding: 'utf8' }).trim();
-        details.push(`✓ Version: ${version}`);
-      } catch (error) {
-        details.push(`⚠ CLI found but version check failed: ${error.message}`);
-      }
-
-      return {
-        installed: true,
-        path: claudeDir && fs.existsSync(claudeDir) ? claudeDir : null,
-        configPath: claudeDir && fs.existsSync(path.join(claudeDir, 'settings.json'))
-          ? path.join(claudeDir, 'settings.json')
-          : null,
-        cliAvailable: true,
-        cliPath: claudePath,
-        details: details.join('\n  ')
-      };
+  for (const p of nativePaths) {
+    if (fs.existsSync(p)) {
+      cliPath = p;
+      details.push(`✓ Found native binary: ${p}`);
+      break;
     }
-  } catch (error) {
-    details.push(`✗ Claude CLI not found in PATH: ${error.message}`);
+  }
+
+  // 2b. Check PATH if not found yet
+  if (!cliPath) {
+    try {
+      const command = process.platform === 'win32' ? 'where claude' : 'which claude';
+      const output = execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const foundPath = output.split(/\r?\n/)[0].trim();
+      if (foundPath && fs.existsSync(foundPath)) {
+        cliPath = foundPath;
+        details.push(`✓ Found in PATH: ${foundPath}`);
+      }
+    } catch (e) {
+      // Ignore error if not found in PATH
+    }
+  }
+
+  // 3. Verify Version (if executable found)
+  if (cliPath) {
+    try {
+      // We use the full path to avoid recursion or alias issues
+      const version = execSync(`"${cliPath}" --version`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      details.push(`✓ Version: ${version}`);
+    } catch (error) {
+      details.push(`⚠ Executable found but version check failed: ${error.message}`);
+    }
+  } else {
+    details.push(`✗ Executable 'claude' not found in PATH or standard locations.`);
   }
 
   return {
-    installed: false,
-    path: null,
-    configPath: null,
-    cliAvailable: false,
+    installed: !!cliPath, // STRICT: Only true if the binary is found
+    configFound: configFound,
+    path: claudeDir,
+    configPath: configFound ? path.join(claudeDir, 'settings.json') : null,
+    cliAvailable: !!cliPath,
+    cliPath: cliPath,
     details: details.join('\n  ')
   };
 }

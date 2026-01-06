@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import chalk from 'chalk';
-import { password } from '@inquirer/prompts';
+import { password, confirm } from '@inquirer/prompts';
 import spawn from 'cross-spawn';
 import updateNotifier from 'update-notifier';
 import process from 'node:process';
+import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { isClaudeCodeInstalled, detectOS, checkGitBashOnWindows, getInstallationInstructions } from './src/detectors/claude-only.js';
 
@@ -31,20 +32,50 @@ console.log(chalk.gray(`✓ OS: ${osInfo.type} (${osInfo.arch})`));
 console.log(chalk.gray(`✓ Shell: ${osInfo.shell}`));
 
 // Check Claude Code installation
-const claudeStatus = isClaudeCodeInstalled();
+let claudeStatus = isClaudeCodeInstalled();
 
 if (!claudeStatus.installed) {
-    console.error(chalk.redBright('\n❌ Claude Code not found'));
+    console.error(chalk.redBright('\n❌ Claude Code CLI not found'));
 
     // Show detailed detection info
-    console.log(chalk.yellow('\nDetection Details:'));
-    console.log(chalk.gray(claudeStatus.details));
+    console.error(chalk.yellow('\nDetection Details:'));
+    console.error(chalk.gray(claudeStatus.details));
+    console.log(''); // spacer
 
-    // Show installation instructions
-    const instructions = getInstallationInstructions(osInfo, claudeStatus);
-    console.log(chalk.cyan(instructions));
+    const shouldInstall = await confirm({
+        message: 'Claude Code CLI is not installed. Do you want to install it via npm now?',
+        default: true
+    });
 
-    process.exit(1);
+    if (shouldInstall) {
+        try {
+            console.log(chalk.cyan('\n📦 Installing @anthropic-ai/claude-code globally...'));
+            execSync('npm install -g @anthropic-ai/claude-code', { stdio: 'inherit' });
+            console.log(chalk.green('✓ Installation successful!'));
+            
+            // Re-detect to get the new path
+            claudeStatus = isClaudeCodeInstalled();
+            
+            if (!claudeStatus.installed) {
+                 // Fallback if install succeeded but path isn't picked up immediately
+                 console.warn(chalk.yellow('⚠ Installation finished, but the executable was not found in the standard paths immediately.'));
+                 console.warn(chalk.yellow('You may need to restart your terminal.'));
+                 process.exit(0);
+            }
+        } catch (e) {
+            console.error(chalk.red(`\n❌ Installation failed: ${e.message}`));
+            console.error(chalk.yellow('Please try installing manually using the instructions below.'));
+            
+            const instructions = getInstallationInstructions(osInfo, claudeStatus);
+            console.error(chalk.cyan(instructions));
+            process.exit(1);
+        }
+    } else {
+        // User declined install
+        const instructions = getInstallationInstructions(osInfo, claudeStatus);
+        console.error(chalk.cyan(instructions));
+        process.exit(1);
+    }
 }
 
 // Show Claude Code status
@@ -119,7 +150,7 @@ if (isDebug) {
     console.log(chalk.yellow('------------------\n'));
 }
 
-const child = spawn('claude', args, {
+const child = spawn(claudeStatus.cliPath, args, {
     stdio: 'inherit',
     env: env
 });
@@ -127,22 +158,31 @@ const child = spawn('claude', args, {
 // Signal Handling
 // We intentionally ignore SIGINT in the parent process.
 // Because stdio is 'inherit', the child process (Claude) receives the Ctrl+C (SIGINT) directly from the TTY.
-// If the parent exits immediately on SIGINT (Node default), it might kill the child or leave the terminal in a weird state.
-// By listening and doing nothing, we let the child handle the exit sequence.
 process.on('SIGINT', () => {
     if (isDebug) {
-        console.log(chalk.yellow('\n[Wrapper] Received SIGINT. Waiting for Claude to exit...'));
+        console.error(chalk.yellow('\n[Wrapper] Received SIGINT. Waiting for Claude to exit...'));
     }
+});
+
+// Handle SIGTERM (e.g., Docker stop, kill)
+process.on('SIGTERM', () => {
+    if (isDebug) {
+        console.error(chalk.yellow('\n[Wrapper] Received SIGTERM. Forwarding to Claude...'));
+    }
+    if (child) {
+        child.kill('SIGTERM');
+    }
+    process.exit(0);
 });
 
 child.on('close', (code) => {
     if (isDebug) {
-        console.log(chalk.yellow(`\n[Wrapper] Child process exited with code ${code}`));
+        console.error(chalk.yellow(`\n[Wrapper] Child process exited with code ${code}`));
     }
     process.exit(code);
 });
 
 child.on('error', (err) => {
-    console.error(chalk.red(`Error launching Claude: ${err.message}`));
+    console.error(chalk.red(`Error launching Claude at ${claudeStatus.cliPath}: ${err.message}`));
     process.exit(1);
 });
