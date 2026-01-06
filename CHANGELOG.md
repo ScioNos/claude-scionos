@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-06
+
+### Added
+- **Debug Mode**: New `--scionos-debug` flag for detailed diagnostic output
+- **Test Infrastructure**: Added Vitest test suite covering core detection logic
+- **Linting**: Fixed development environment and linting rules
+
+### Fixed
+- **Windows Path Handling**: Fixed an issue where `where claude` returned multiple paths on Windows
+- **Signal Handling**: Improved `SIGINT` (Ctrl+C) handling to prevent wrapper from killing Claude prematurely
+
 ## [2.0.0] - 2025-12-12
 
 ### ⚠️ BREAKING CHANGES

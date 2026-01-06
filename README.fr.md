@@ -107,6 +107,14 @@ npx claude-scionos
 3. Lance Claude Code avec le jeton stocké **uniquement en mémoire**
 4. Nettoie automatiquement les informations d'identification à la sortie
 
+#### Débogage
+
+Si vous rencontrez des problèmes, utilisez le flag de débogage pour voir les informations détaillées :
+
+```bash
+npx claude-scionos --scionos-debug
+```
+
 #### Exemple de session
 
 ```bash

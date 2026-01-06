@@ -53,7 +53,9 @@ function isClaudeCodeInstalled() {
   // Also check for the claude CLI command in PATH
   try {
     const command = process.platform === 'win32' ? 'where claude' : 'which claude';
-    const claudePath = execSync(command, { encoding: 'utf8' }).trim();
+    const output = execSync(command, { encoding: 'utf8' });
+    // On Windows 'where' can return multiple paths, take the first one
+    const claudePath = output.split(/\r?\n/)[0].trim();
 
     if (claudePath) {
       details.push(`✓ Claude CLI found in PATH: ${claudePath}`);

@@ -14,11 +14,13 @@ const pkg = require('./package.json');
 // Initialize update notifier
 updateNotifier({ pkg }).notify();
 
-// 0. Handle --version / -v flag
+// 0. Handle Flags
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
     console.log(pkg.version);
     process.exit(0);
 }
+
+const isDebug = process.argv.includes('--scionos-debug');
 
 // 1. Enhanced System Detection
 console.log(chalk.cyan('🔍 Checking system configuration...'));
@@ -50,6 +52,7 @@ console.log(chalk.green('\n✓ Claude Code detected'));
 console.log(chalk.gray(claudeStatus.details));
 
 // 2. Check Git Bash on Windows (if needed)
+let gitBashPath = null;
 if (process.platform === 'win32') {
     console.log(chalk.cyan('\n🔍 Checking Git Bash availability...'));
     const gitBashStatus = checkGitBashOnWindows();
@@ -69,6 +72,7 @@ if (process.platform === 'win32') {
     } else {
         console.log(chalk.green('✓ Git Bash available'));
         console.log(chalk.gray(gitBashStatus.message));
+        gitBashPath = gitBashStatus.path;
     }
 }
 
@@ -76,6 +80,7 @@ if (process.platform === 'win32') {
 console.clear();
 console.log(chalk.cyan.bold("Claude Code (via ScioNos)"));
 console.log(chalk.gray(`Running on ${osInfo.type} with ${osInfo.shell}`));
+if (isDebug) console.log(chalk.yellow("🐞 Debug Mode Active"));
 
 // 4. Token info
 console.log(chalk.blueBright("To retrieve your token, visit: https://routerlab.ch/keys"));
@@ -101,13 +106,39 @@ const env = {
 };
 
 // 7. Launch Claude Code
-const args = process.argv.slice(2);
+// Filter out our internal flag before passing args to Claude
+const args = process.argv.slice(2).filter(arg => arg !== '--scionos-debug');
+
+if (isDebug) {
+    console.log(chalk.yellow('\n--- DEBUG INFO ---'));
+    console.log(chalk.gray(`Platform: ${process.platform}`));
+    console.log(chalk.gray(`Claude Command: claude ${args.join(' ')}`));
+    console.log(chalk.gray(`Router URL: ${env.ANTHROPIC_BASE_URL}`));
+    console.log(chalk.gray(`Token Length: ${token.length} chars`));
+    if (gitBashPath) console.log(chalk.gray(`Git Bash: ${gitBashPath}`));
+    console.log(chalk.yellow('------------------\n'));
+}
+
 const child = spawn('claude', args, {
     stdio: 'inherit',
     env: env
 });
 
+// Signal Handling
+// We intentionally ignore SIGINT in the parent process.
+// Because stdio is 'inherit', the child process (Claude) receives the Ctrl+C (SIGINT) directly from the TTY.
+// If the parent exits immediately on SIGINT (Node default), it might kill the child or leave the terminal in a weird state.
+// By listening and doing nothing, we let the child handle the exit sequence.
+process.on('SIGINT', () => {
+    if (isDebug) {
+        console.log(chalk.yellow('\n[Wrapper] Received SIGINT. Waiting for Claude to exit...'));
+    }
+});
+
 child.on('close', (code) => {
+    if (isDebug) {
+        console.log(chalk.yellow(`\n[Wrapper] Child process exited with code ${code}`));
+    }
     process.exit(code);
 });
 

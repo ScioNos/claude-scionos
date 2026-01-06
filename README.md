@@ -94,7 +94,7 @@ claude-scionos
 
 #### Basic Usage
 
-Simply execute the command:
+Run the command:
 
 ```bash
 npx claude-scionos
@@ -102,24 +102,20 @@ npx claude-scionos
 
 **What happens:**
 
-1. The tool checks if Claude Code CLI is installed
-2. Prompts you to enter your `ANTHROPIC_AUTH_TOKEN`
-3. Launches Claude Code with the token stored **only in memory**
-4. Automatically cleans up credentials when you exit
+1.  Checks if Claude Code CLI is installed
+2.  Prompts for your `ANTHROPIC_AUTH_TOKEN`
+3.  Launches Claude Code with token stored **in memory only**
+4.  Automatically cleans credentials on exit
 
-#### Example Session
+#### Debugging
+
+If you encounter issues, you can run with the debug flag to see detailed diagnostic information:
 
 ```bash
-$ npx claude-scionos
-
-Claude Code (via ScioNos)
-To retrieve your token, visit: https://routerlab.ch/keys
-? Please enter your ANTHROPIC_AUTH_TOKEN: ********
-
-# Claude Code starts...
+npx claude-scionos --scionos-debug
 ```
 
-#### Command-Line Options
+#### Command Line Options
 
 ```bash
 # Display version
