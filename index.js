@@ -116,22 +116,73 @@ if (isDebug) console.log(chalk.yellow("🐞 Debug Mode Active"));
 // 4. Token info
 console.log(chalk.blueBright("To retrieve your token, visit: https://routerlab.ch/keys"));
 
-// 5. Token input
-const token = await password({
-    message: "Please enter your ANTHROPIC_AUTH_TOKEN:",
-    validate: (input) => {
-        if (!input || input.trim() === '') {
-            return "Token cannot be empty.";
+// 5. Token Validation Loop
+const BASE_URL = "https://routerlab.ch";
+let token = "";
+
+async function validateToken(apiKey) {
+    try {
+        const response = await fetch(`${BASE_URL}/v1/models`, {
+            method: 'GET',
+            headers: {
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            }
+        });
+
+        if (response.ok) {
+            return { valid: true };
+        } else if (response.status === 401 || response.status === 403) {
+            return { valid: false, reason: 'auth_failed' };
+        } else {
+            return { valid: false, reason: 'server_error', status: response.status, statusText: response.statusText };
         }
-        return true;
-    },
-    mask: '*'
-});
+    } catch (error) {
+        return { valid: false, reason: 'network_error', message: error.message };
+    }
+}
+
+while (true) {
+    token = await password({
+        message: "Please enter your ANTHROPIC_AUTH_TOKEN:",
+        validate: (input) => {
+            if (!input || input.trim() === '') {
+                return "Token cannot be empty.";
+            }
+            return true;
+        },
+        mask: '*'
+    });
+
+    console.log(chalk.gray("Validating token..."));
+    const validation = await validateToken(token);
+
+    if (validation.valid) {
+        console.log(chalk.green("✓ Token validated successfully."));
+        break;
+    } else if (validation.reason === 'auth_failed') {
+        console.log(chalk.red("❌ Invalid token. Access denied (401/403). Please try again."));
+        // Loop continues
+    } else {
+        // Server or Network error
+        console.log(chalk.yellow(`⚠ Validation warning: ${validation.reason === 'server_error' ? `Server returned ${validation.status} ${validation.statusText}` : validation.message}`));
+        
+        const shouldContinue = await confirm({
+            message: "Could not validate token due to network/server issue. Continue anyway?",
+            default: false
+        });
+
+        if (shouldContinue) {
+            break;
+        }
+        // Loop continues if they say "No" (want to retry token)
+    }
+}
 
 // 6. Environment configuration
 const env = {
     ...process.env,
-    ANTHROPIC_BASE_URL: "https://routerlab.ch",
+    ANTHROPIC_BASE_URL: BASE_URL,
     ANTHROPIC_AUTH_TOKEN: token,
     ANTHROPIC_API_KEY: "" // Force empty string
 };
@@ -183,6 +234,18 @@ child.on('close', (code) => {
 });
 
 child.on('error', (err) => {
-    console.error(chalk.red(`Error launching Claude at ${claudeStatus.cliPath}: ${err.message}`));
+    console.error(chalk.red(`\n❌ Error launching Claude CLI:`));
+    
+    if (err.code === 'ENOENT') {
+        console.error(chalk.yellow(`   The executable '${claudeStatus.cliPath}' was not found.`));
+        console.error(chalk.yellow(`   It may have been deleted or moved. Please try reinstalling:`));
+        console.error(chalk.cyan(`   npm install -g @anthropic-ai/claude-code`));
+    } else if (err.code === 'EACCES') {
+        console.error(chalk.yellow(`   Permission denied accessing '${claudeStatus.cliPath}'.`));
+        console.error(chalk.yellow(`   Try running with elevated privileges (sudo or Administrator) or check file permissions.`));
+    } else {
+        console.error(chalk.yellow(`   ${err.message}`));
+    }
+    
     process.exit(1);
 });

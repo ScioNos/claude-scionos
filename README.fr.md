@@ -99,7 +99,7 @@ npx claude-scionos
 **Ce qui se passe :**
 
 1. L'outil vérifie si la CLI Claude Code est installée (si non, propose l'**installation automatique**)
-2. Vous invite à saisir votre `ANTHROPIC_AUTH_TOKEN`
+2. Vous invite à saisir votre `ANTHROPIC_AUTH_TOKEN` et le valide instantanément
 3. Lance Claude Code avec le jeton stocké **uniquement en mémoire**
 4. Nettoie automatiquement les informations d'identification à la sortie
 
@@ -148,7 +148,7 @@ Pour une liste complète des flags et commandes disponibles, consultez la [docum
 ### 🔍 Fonctionnement
 
 1. **Vérification** : Vérifie que la commande `claude` est disponible dans votre PATH
-2. **Saisie du jeton** : Demande de manière sécurisée votre jeton d'authentification (entrée masquée)
+2. **Validation du jeton** : Demande et valide votre jeton en temps réel via l'API (assurant qu'il est fonctionnel avant le lancement)
 3. **Configuration de l'environnement** : Crée des variables d'environnement isolées :
    - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
    - `ANTHROPIC_AUTH_TOKEN` → Votre jeton (mémoire uniquement)

@@ -99,7 +99,7 @@ npx claude-scionos
 **What happens:**
 
 1.  Checks if Claude Code CLI is installed (if not, offers **automatic installation**)
-2.  Prompts for your `ANTHROPIC_AUTH_TOKEN`
+2.  Prompts for your `ANTHROPIC_AUTH_TOKEN` and validates it instantly
 3.  Launches Claude Code with token stored **in memory only**
 4.  Automatically cleans credentials on exit
 
@@ -136,7 +136,7 @@ For a complete list of available flags and commands, see the [official Claude Co
 ### 🔍 How It Works
 
 1. **Verification**: Checks if `claude` command is available in your PATH
-2. **Token Input**: Securely prompts for your authentication token (masked input)
+2. **Token Validation**: Prompts for and validates your token in real-time via the API (ensuring it works before launch)
 3. **Environment Setup**: Creates isolated environment variables:
    - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
    - `ANTHROPIC_AUTH_TOKEN` → Your token (memory only)

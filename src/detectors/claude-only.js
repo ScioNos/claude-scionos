@@ -6,7 +6,15 @@ import os from 'os';
 
 /**
  * Detects if Claude Code is installed and returns detailed status
- * @returns {{installed: boolean, path: string|null, configPath: string|null, cliAvailable: boolean, details: string}}
+ * @returns {{
+ *   installed: boolean, 
+ *   path: string|null, 
+ *   configPath: string|null, 
+ *   cliAvailable: boolean, 
+ *   cliPath: string|null, 
+ *   details: string,
+ *   configFound: boolean
+ * }}
  */
 function isClaudeCodeInstalled() {
   // Check for Claude Code directory in user home
