@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-01-11
+
+### Added
+- **Model Mapping & Proxy**: Integrated local proxy to transparently map Claude models to **GLM-4.7** or **MiniMax-M2.1**.
+- **Active Token Validation**: Now validates the `ANTHROPIC_AUTH_TOKEN` against the `routerlab.ch` API in real-time before launching.
+- **Interactive Menu**: Added a selection menu at startup to choose the model strategy (Default vs Mapped).
+- **Pro Branding**: New professional "ScioNos ✕ Claude Code" banner with corporate colors.
+
+### Improved
+- **Error Handling**: Better distinction between missing executable (`ENOENT`) and permission errors (`EACCES`).
+- **User Interface**: Clearer validation steps and visual feedback.
+
 ## [2.2.0] - 2026-01-06
 
 ### Added

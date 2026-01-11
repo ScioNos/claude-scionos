@@ -41,11 +41,11 @@ The goal is to offer a clean, isolated, and professional execution layer fully c
 ### 📌 Key Features
 
 - 🔒 **Token Isolation** — Authentication token never written to disk
+- 🔄 **Model Mapping** — Transparently route requests to **GLM-4.7** or **MiniMax-M2.1** via local proxy
 - 💾 **Zero Persistence** — No temporary files or local configuration stored
 - 🧩 **Full Compatibility** — Works seamlessly with the official Claude Code CLI
 - 🔐 **Memory-Only Storage** — All credentials destroyed on process exit
 - 🚀 **Quick Start** — Single command execution via `npx`
-- 🧪 **CI/CD Ready** — Suitable for automated workflows and pipelines
 
 ---
 
@@ -100,8 +100,12 @@ npx claude-scionos
 
 1.  Checks if Claude Code CLI is installed (if not, offers **automatic installation**)
 2.  Prompts for your `ANTHROPIC_AUTH_TOKEN` and validates it instantly
-3.  Launches Claude Code with token stored **in memory only**
-4.  Automatically cleans credentials on exit
+3.  **Selection Menu**: Choose your model strategy:
+    - *Default*: Use standard Anthropic models (Opus/Sonnet/Haiku)
+    - *Force GLM-4.7*: Maps all requests to GLM-4.7
+    - *Force MiniMax-M2.1*: Maps all requests to MiniMax-M2.1
+4.  Launches Claude Code (starting a transparent local proxy if needed)
+5.  Automatically cleans credentials on exit
 
 #### Debugging
 
