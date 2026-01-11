@@ -98,7 +98,7 @@ function startProxyServer(targetModel, validToken) {
                         let bodyJson;
                         try {
                             bodyJson = JSON.parse(bodyBuffer.toString());
-                        } catch (e) {
+                        } catch {
                             // If not JSON, forward as is
                             bodyJson = null;
                         }
@@ -115,14 +115,26 @@ function startProxyServer(targetModel, validToken) {
                         }
 
                         // Prepare upstream request
+                        // 1. Create an agent that ignores SSL errors (CRITICAL for internal/testing environments)
+                        const { Agent } = await import('undici'); 
+                        const dispatcher = new Agent({
+                            connect: {
+                                rejectUnauthorized: false // WARNING: Ignores SSL certificate errors
+                            }
+                        });
+
+                        // 2. Remove problematic headers that fetch handles automatically
+                        const upstreamHeaders = { ...req.headers };
+                        delete upstreamHeaders['host'];           // Let fetch set the correct Host based on URL
+                        delete upstreamHeaders['content-length']; // Let fetch calculate length based on body
+                        upstreamHeaders['x-api-key'] = validToken;
+
+                        // 3. Execute request with the permissive dispatcher
                         const upstreamRes = await fetch(`${BASE_URL}${req.url}`, {
                             method: 'POST',
-                            headers: {
-                                ...req.headers,
-                                'host': new URL(BASE_URL).host,
-                                'x-api-key': validToken // Ensure we use the validated token
-                            },
-                            body: bodyJson ? JSON.stringify(bodyJson) : bodyBuffer
+                            headers: upstreamHeaders,
+                            body: bodyJson ? JSON.stringify(bodyJson) : bodyBuffer,
+                            dispatcher: dispatcher // <--- Apply the custom agent here
                         });
 
                         // Pipe response back
@@ -150,13 +162,20 @@ function startProxyServer(targetModel, validToken) {
                 
                 // Simple Redirect implementation for non-body requests
                 try {
+                    // 1. Create agent (SSL bypass)
+                    const { Agent } = await import('undici');
+                    const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+
+                    // 2. Clean headers
+                    const upstreamHeaders = { ...req.headers };
+                    delete upstreamHeaders['host'];
+                    delete upstreamHeaders['content-length'];
+                    upstreamHeaders['x-api-key'] = validToken;
+
                      const upstreamRes = await fetch(`${BASE_URL}${req.url}`, {
                         method: req.method,
-                        headers: {
-                            ...req.headers,
-                            'host': new URL(BASE_URL).host,
-                            'x-api-key': validToken
-                        }
+                        headers: upstreamHeaders,
+                        dispatcher: dispatcher
                     });
                      res.writeHead(upstreamRes.status, upstreamRes.headers);
                      if (upstreamRes.body) {
@@ -166,7 +185,7 @@ function startProxyServer(targetModel, validToken) {
                         }
                      }
                      res.end();
-                } catch (e) {
+                } catch {
                     res.writeHead(502);
                     res.end();
                 }
@@ -231,7 +250,6 @@ if (!claudeStatus.installed) {
 }
 
 // Check Git Bash on Windows
-let gitBashPath = null;
 if (process.platform === 'win32') {
     const gitBashStatus = checkGitBashOnWindows();
     if (!gitBashStatus.available) {
@@ -239,7 +257,6 @@ if (process.platform === 'win32') {
         console.log(chalk.cyan('Please install Git for Windows: https://git-scm.com/downloads/win'));
         process.exit(1);
     }
-    gitBashPath = gitBashStatus.path;
 }
 
 // 3. Token Loop

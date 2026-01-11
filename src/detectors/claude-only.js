@@ -58,7 +58,7 @@ function isClaudeCodeInstalled() {
         cliPath = foundPath;
         details.push(`✓ Found in PATH: ${foundPath}`);
       }
-    } catch (e) {
+    } catch {
       // Ignore error if not found in PATH
     }
   }
