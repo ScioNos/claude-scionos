@@ -24,7 +24,7 @@ const BASE_URL = "https://routerlab.ch";
  * Displays the application banner
  */
 function showBanner() {
-    console.clear();
+    if (!process.env.CI && !process.argv.includes('--no-clear')) console.clear();
     const p = chalk.hex('#3b82f6'); // Primary (Scio)
     const s = chalk.hex('#a855f7'); // Secondary (Nos)
     const c = chalk.hex('#D97757'); // Claude Orange
@@ -47,13 +47,17 @@ function showBanner() {
  */
 async function validateToken(apiKey) {
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
         const response = await fetch(`${BASE_URL}/v1/models`, {
             method: 'GET',
             headers: {
                 'x-api-key': apiKey,
                 'anthropic-version': '2023-06-01'
-            }
+            },
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (response.ok) {
             return { valid: true };
@@ -91,7 +95,18 @@ function startProxyServer(targetModel, validToken) {
             // Claude Code uses /v1/messages
             if (req.method === 'POST' && req.url.includes('/messages')) {
                 const chunks = [];
-                req.on('data', chunk => chunks.push(chunk));
+                const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+                let totalSize = 0;
+                req.on('data', chunk => {
+                    totalSize += chunk.length;
+                    if (totalSize > MAX_SIZE) {
+                        res.writeHead(413);
+                        res.end(JSON.stringify({ error: { message: 'Request too large' } }));
+                        req.destroy();
+                        return;
+                    }
+                    chunks.push(chunk);
+                });
                 req.on('end', async () => {
                     try {
                         const bodyBuffer = Buffer.concat(chunks);
@@ -293,9 +308,9 @@ const modelChoice = await select({
             description: 'Standard behavior. Claude decides which model to use.'
         },
         {
-            name: 'Force GLM-4.7 (Map all models to GLM-4.7)',
-            value: 'glm-4.7',
-            description: 'Intercepts traffic and routes everything to GLM-4.7'
+            name: 'Kimi K2.5',
+            value: 'kimi-k2.5',
+            description: 'Force all requests to Kimi K2.5'
         },
         {
             name: 'Force MiniMax-M2.1 (Map all models to MiniMax)',
