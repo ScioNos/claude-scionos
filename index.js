@@ -1,8 +1,26 @@
 #!/usr/bin/env node
 
-import chalk from 'chalk';
+import { styleText } from 'node:util';
+const chalk = {
+    hex: (color) => {
+        if (color === '#3b82f6') return (t) => styleText('blueBright', t);
+        if (color === '#a855f7') return (t) => styleText('magentaBright', t);
+        if (color === '#D97757') return (t) => styleText('redBright', t);
+        return (t) => t;
+    },
+    white: (t) => styleText('white', t),
+    gray: (t) => styleText('gray', t),
+    yellow: (t) => styleText('yellow', t),
+    red: (t) => styleText('red', t),
+    cyan: (t) => styleText('cyan', t),
+    redBright: (t) => styleText('redBright', t),
+    blueBright: (t) => styleText('blueBright', t),
+    green: (t) => styleText('green', t),
+    magenta: (t) => styleText('magenta', t),
+    bold: (t) => styleText('bold', t)
+};
 import { password, confirm, select } from '@inquirer/prompts';
-import spawn from 'cross-spawn';
+import { spawn } from 'node:child_process';
 import updateNotifier from 'update-notifier';
 import process from 'node:process';
 import http from 'node:http';
@@ -35,7 +53,7 @@ function showBanner() {
     console.log("");
     console.log(border("   ┌──────────────────────────────────────────────────────────┐"));
     console.log(border("   │                                                          │"));
-    console.log(border("   │                 ") + p.bold("Scio") + s.bold("Nos") + w.bold("  ✕  ") + c.bold("Claude Code") + border("                  │"));
+    console.log(border("   │                 ") + chalk.bold(p("Scio")) + chalk.bold(s("Nos")) + chalk.bold(w("  ✕  ")) + chalk.bold(c("Claude Code")) + border("                  │"));
     console.log(border("   │                                                          │"));
     console.log(border("   └──────────────────────────────────────────────────────────┘"));
     console.log(g(`                                                   v${pkg.version}`));
@@ -120,13 +138,22 @@ function startProxyServer(targetModel, validToken) {
 
                         // THE MAGIC: Swap the model
                         if (bodyJson && bodyJson.model) {
-                            // Map any Claude model to our target
-                            // Claude Code usually requests 'claude-3-opus-...' or 'claude-3-5-sonnet...'
-                            // We force the target.
-                            if (process.argv.includes('--scionos-debug')) {
-                                console.log(chalk.yellow(`[Proxy] Swapping model ${bodyJson.model} -> ${targetModel}`));
+                            let newModel = targetModel;
+                            if (targetModel === 'aws') {
+                                if (bodyJson.model.includes('haiku')) {
+                                    newModel = 'aws-claude-haiku-4-5-20251001';
+                                } else if (bodyJson.model.includes('opus')) {
+                                    newModel = 'aws-claude-opus-4-6';
+                                } else {
+                                    // Default to sonnet for AWS if not haiku or opus
+                                    newModel = 'aws-claude-sonnet-4-6';
+                                }
                             }
-                            bodyJson.model = targetModel;
+                            
+                            if (process.argv.includes('--scionos-debug')) {
+                                console.log(chalk.yellow(`[Proxy] Swapping model ${bodyJson.model} -> ${newModel}`));
+                            }
+                            bodyJson.model = newModel;
                         }
 
                         // Prepare upstream request
@@ -247,7 +274,7 @@ if (!claudeStatus.installed) {
     if (shouldInstall) {
         try {
             console.log(chalk.cyan('\n📦 Installing @anthropic-ai/claude-code...'));
-            spawn.sync('npm', ['install', '-g', '@anthropic-ai/claude-code'], { stdio: 'inherit' });
+            spawn.sync('npm', ['install', '-g', '@anthropic-ai/claude-code'], { stdio: 'inherit', shell: process.platform === 'win32' });
             claudeStatus = isClaudeCodeInstalled();
             if (!claudeStatus.installed) {
                  console.warn(chalk.yellow('⚠ Installation finished, but executable not found immediately. Restart terminal recommended.'));
@@ -275,7 +302,7 @@ if (process.platform === 'win32') {
 }
 
 // 3. Token Loop
-let token = "";
+let token;
 while (true) {
     console.log(chalk.blueBright("To retrieve your token, visit: https://routerlab.ch/keys"));
     token = await password({
@@ -303,19 +330,24 @@ const modelChoice = await select({
     message: 'Select Model Strategy:',
     choices: [
         {
-            name: 'Default (Use Claude Opus/Sonnet/Haiku natively)',
+            name: 'Default (Use Claude natively)',
             value: 'default',
             description: 'Standard behavior. Claude decides which model to use.'
         },
         {
-            name: 'Kimi K2.5',
-            value: 'kimi-k2.5',
-            description: 'Force all requests to Kimi K2.5'
+            name: 'Claude AWS (-50% du prix 💰)',
+            value: 'aws',
+            description: 'Map models to aws-claude-haiku, aws-claude-sonnet, aws-claude-opus'
         },
         {
-            name: 'Force MiniMax-M2.1 (Map all models to MiniMax)',
-            value: 'minimax-m2.1',
-            description: 'Intercepts traffic and routes everything to MiniMax-M2.1'
+            name: 'GLM-5',
+            value: 'glm-5',
+            description: 'Remplace tous les modèles par glm-5'
+        },
+        {
+            name: 'MiniMax M2.5',
+            value: 'minimax-m2.5',
+            description: 'Remplace tous les modèles par minimax-m2.5'
         }
     ]
 });
@@ -357,7 +389,8 @@ console.log(chalk.green(`\n🚀 Launching Claude Code [${modelChoice}]...\n`));
 
 const child = spawn(claudeStatus.cliPath, args, {
     stdio: 'inherit',
-    env: env
+    env: env,
+    shell: process.platform === 'win32'
 });
 
 // 7. Cleanup Handlers

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.5] - 2026-03-16
+
+### Added
+- **Dynamic AWS Models**: Integrated dynamic routing for AWS 50% discount models (`haiku`, `sonnet`, `opus`) in the local proxy.
+- **Model Selection**: Cleaned up the initial prompt menu to offer 4 robust strategic choices including GLM-5 and MiniMax M2.5.
+
+## [3.0.4] - 2026-03-16
+
+### Changed
+- **Dependencies**: Replaced `chalk`, `cross-spawn`, and `undici` with Node.js >= 22 native APIs (`util.styleText`, `child_process.spawn`, `fetch`).
+- **Dependencies**: Updated development and production packages to the latest versions.
+
+### Fixed
+- **Code Quality**: Fixed `Token` ESLint assignment warnings and improved formatting compatibility.
+
 ## [3.0.3] - 2026-02-18
 
 ### Changed
