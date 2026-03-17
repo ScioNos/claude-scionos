@@ -66,7 +66,7 @@ function showBanner() {
 async function validateToken(apiKey) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
         const response = await fetch(`${BASE_URL}/v1/models`, {
             method: 'GET',
             headers: {
@@ -85,6 +85,9 @@ async function validateToken(apiKey) {
             return { valid: false, reason: 'server_error', status: response.status, statusText: response.statusText };
         }
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return { valid: false, reason: 'timeout', message: 'Request timed out after 30s' };
+        }
         return { valid: false, reason: 'network_error', message: error.message };
     }
 }
@@ -132,7 +135,6 @@ function startProxyServer(targetModel, validToken) {
                         try {
                             bodyJson = JSON.parse(bodyBuffer.toString());
                         } catch {
-                            // If not JSON, forward as is
                             bodyJson = null;
                         }
 
@@ -145,54 +147,73 @@ function startProxyServer(targetModel, validToken) {
                                 } else if (bodyJson.model.includes('opus')) {
                                     newModel = 'aws-claude-opus-4-6';
                                 } else {
-                                    // Default to sonnet for AWS if not haiku or opus
                                     newModel = 'aws-claude-sonnet-4-6';
                                 }
                             }
-                            
+
                             if (process.argv.includes('--scionos-debug')) {
                                 console.log(chalk.yellow(`[Proxy] Swapping model ${bodyJson.model} -> ${newModel}`));
                             }
                             bodyJson.model = newModel;
                         }
 
-                        // Prepare upstream request
-                        // 1. Create an agent that ignores SSL errors (CRITICAL for internal/testing environments)
-                        const { Agent } = await import('undici'); 
-                        const dispatcher = new Agent({
-                            connect: {
-                                rejectUnauthorized: false // WARNING: Ignores SSL certificate errors
-                            }
-                        });
-
-                        // 2. Remove problematic headers that fetch handles automatically
-                        const upstreamHeaders = { ...req.headers };
-                        delete upstreamHeaders['host'];           // Let fetch set the correct Host based on URL
-                        delete upstreamHeaders['content-length']; // Let fetch calculate length based on body
-                        upstreamHeaders['x-api-key'] = validToken;
-
-                        // 3. Execute request with the permissive dispatcher
-                        const upstreamRes = await fetch(`${BASE_URL}${req.url}`, {
+                        // Forward request using https directly
+                        const https = await import('node:https');
+                        const url = new URL(`${BASE_URL}${req.url}`);
+                        
+                        const options = {
+                            hostname: url.hostname,
+                            port: url.port || 443,
+                            path: url.pathname + url.search,
                             method: 'POST',
-                            headers: upstreamHeaders,
-                            body: bodyJson ? JSON.stringify(bodyJson) : bodyBuffer,
-                            dispatcher: dispatcher // <--- Apply the custom agent here
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-api-key': validToken,
+                                'anthropic-version': '2023-06-01',
+                                'Content-Length': bodyJson ? Buffer.byteLength(JSON.stringify(bodyJson)) : bodyBuffer.length
+                            },
+                            rejectUnauthorized: false,
+                            timeout: 120000
+                        };
+
+                        const proxyReq = https.request(options, (proxyRes) => {
+                            if (process.argv.includes('--scionos-debug')) {
+                                console.log(chalk.yellow(`[Proxy] Upstream response status: ${proxyRes.statusCode}`));
+                            }
+                            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+                            proxyRes.pipe(res);
                         });
 
-                        // Pipe response back
-                        res.writeHead(upstreamRes.status, upstreamRes.headers);
-                        if (upstreamRes.body) {
-                            // @ts-ignore - Node fetch body is iterable
-                            for await (const chunk of upstreamRes.body) {
-                                res.write(chunk);
+                        proxyReq.on('error', (error) => {
+                            console.error(chalk.red(`[Proxy Error] POST /messages: ${error.message}`));
+                            console.error(chalk.red(`  Code: ${error.code}`));
+                            if (!res.headersSent) {
+                                res.writeHead(500);
+                                res.end(JSON.stringify({ error: { message: "Proxy Error", details: error.message, code: error.code } }));
                             }
-                        }
-                        res.end();
+                        });
 
+                        proxyReq.on('timeout', () => {
+                            console.error(chalk.red(`[Proxy] Request timeout`));
+                            proxyReq.destroy();
+                            if (!res.headersSent) {
+                                res.writeHead(504);
+                                res.end(JSON.stringify({ error: { message: "Gateway Timeout" } }));
+                            }
+                        });
+
+                        proxyReq.write(bodyJson ? JSON.stringify(bodyJson) : bodyBuffer);
+                        proxyReq.end();
+
+                        if (process.argv.includes('--scionos-debug')) {
+                            console.log(chalk.yellow(`[Proxy] Request sent to upstream`));
+                        }
                     } catch (error) {
-                        console.error(chalk.red(`[Proxy Error] ${error.message}`));
-                        res.writeHead(500);
-                        res.end(JSON.stringify({ error: { message: "Scionos Proxy Error" } }));
+                        console.error(chalk.red(`[Proxy Error] POST /messages: ${error.message}`));
+                        if (!res.headersSent) {
+                            res.writeHead(500);
+                            res.end(JSON.stringify({ error: { message: "Scionos Proxy Error", details: error.message } }));
+                        }
                     }
                 });
             } else {
@@ -204,32 +225,58 @@ function startProxyServer(targetModel, validToken) {
                 
                 // Simple Redirect implementation for non-body requests
                 try {
-                    // 1. Create agent (SSL bypass)
-                    const { Agent } = await import('undici');
-                    const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
-
-                    // 2. Clean headers
-                    const upstreamHeaders = { ...req.headers };
-                    delete upstreamHeaders['host'];
-                    delete upstreamHeaders['content-length'];
-                    upstreamHeaders['x-api-key'] = validToken;
-
-                     const upstreamRes = await fetch(`${BASE_URL}${req.url}`, {
+                    const https = await import('node:https');
+                    const url = new URL(`${BASE_URL}${req.url}`);
+                    
+                    const options = {
+                        hostname: url.hostname,
+                        port: url.port || 443,
+                        path: url.pathname + url.search,
                         method: req.method,
-                        headers: upstreamHeaders,
-                        dispatcher: dispatcher
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': validToken,
+                            'anthropic-version': '2023-06-01'
+                        },
+                        rejectUnauthorized: false,
+                        timeout: 60000
+                    };
+
+                    const proxyReq = https.request(options, (proxyRes) => {
+                        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+                        proxyRes.pipe(res);
                     });
-                     res.writeHead(upstreamRes.status, upstreamRes.headers);
-                     if (upstreamRes.body) {
-                        // @ts-ignore
-                        for await (const chunk of upstreamRes.body) {
-                            res.write(chunk);
+
+                    proxyReq.on('error', (error) => {
+                        console.error(chalk.red(`[Proxy Error] ${req.method} ${req.url}: ${error.message}`));
+                        if (!res.headersSent) {
+                            res.writeHead(502);
+                            res.end(JSON.stringify({
+                                error: {
+                                    message: "Scionos Proxy Error: Failed to connect to upstream",
+                                    details: error.message
+                                }
+                            }));
                         }
-                     }
-                     res.end();
-                } catch {
-                    res.writeHead(502);
-                    res.end();
+                    });
+
+                    // Forward body for PUT/POST requests
+                    if (req.method === 'POST' || req.method === 'PUT') {
+                        req.pipe(proxyReq);
+                    } else {
+                        proxyReq.end();
+                    }
+                } catch (error) {
+                    console.error(chalk.red(`[Proxy Error] ${req.method} ${req.url}: ${error.message}`));
+                    if (!res.headersSent) {
+                        res.writeHead(502);
+                        res.end(JSON.stringify({
+                            error: {
+                                message: "Scionos Proxy Error: Failed to connect to upstream",
+                                details: error.message
+                            }
+                        }));
+                    }
                 }
             }
         });
@@ -341,13 +388,13 @@ const modelChoice = await select({
         },
         {
             name: 'GLM-5',
-            value: 'glm-5',
-            description: 'Remplace tous les modèles par glm-5'
+            value: 'glm-5-claude',
+            description: 'Remplace tous les modèles par glm-5-claude'
         },
         {
             name: 'MiniMax M2.5',
-            value: 'minimax-m2.5',
-            description: 'Remplace tous les modèles par minimax-m2.5'
+            value: 'minimax-m2.5-claude',
+            description: 'Remplace tous les modèles par minimax-m2.5-claude'
         }
     ]
 });
