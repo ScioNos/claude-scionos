@@ -20,8 +20,7 @@ const chalk = {
     bold: (t) => styleText('bold', t)
 };
 import { password, confirm, select } from '@inquirer/prompts';
-import { spawn } from 'node:child_process';
-import updateNotifier from 'update-notifier';
+import { spawn, spawnSync } from 'node:child_process';
 import process from 'node:process';
 import http from 'node:http';
 import { createRequire } from 'node:module';
@@ -29,9 +28,7 @@ import { isClaudeCodeInstalled, detectOS, checkGitBashOnWindows, getInstallation
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
-
-// Initialize update notifier
-updateNotifier({ pkg }).notify();
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 // --- CONFIGURATION ---
 const BASE_URL = "https://routerlab.ch";
@@ -94,7 +91,7 @@ async function validateToken(apiKey) {
 
 /**
  * Starts a local proxy server to map models
- * @param {string} targetModel - The model ID to map to (e.g., 'glm-4.7')
+ * @param {string} targetModel - The model ID to map to (e.g., 'claude-glm-5')
  * @param {string} validToken - The validated Auth Token
  * @returns {Promise<string>} - The local URL (e.g., http://127.0.0.1:45321)
  */
@@ -172,7 +169,6 @@ function startProxyServer(targetModel, validToken) {
                                 'anthropic-version': '2023-06-01',
                                 'Content-Length': bodyJson ? Buffer.byteLength(JSON.stringify(bodyJson)) : bodyBuffer.length
                             },
-                            rejectUnauthorized: false,
                             timeout: 120000
                         };
 
@@ -238,7 +234,6 @@ function startProxyServer(targetModel, validToken) {
                             'x-api-key': validToken,
                             'anthropic-version': '2023-06-01'
                         },
-                        rejectUnauthorized: false,
                         timeout: 60000
                     };
 
@@ -321,7 +316,15 @@ if (!claudeStatus.installed) {
     if (shouldInstall) {
         try {
             console.log(chalk.cyan('\n📦 Installing @anthropic-ai/claude-code...'));
-            spawn.sync('npm', ['install', '-g', '@anthropic-ai/claude-code'], { stdio: 'inherit', shell: process.platform === 'win32' });
+            const installResult = spawnSync(npmCommand, ['install', '-g', '@anthropic-ai/claude-code'], {
+                stdio: 'inherit'
+            });
+            if (installResult.error) {
+                throw installResult.error;
+            }
+            if (installResult.status !== 0) {
+                throw new Error(`npm install exited with code ${installResult.status}`);
+            }
             claudeStatus = isClaudeCodeInstalled();
             if (!claudeStatus.installed) {
                  console.warn(chalk.yellow('⚠ Installation finished, but executable not found immediately. Restart terminal recommended.'));
@@ -388,13 +391,13 @@ const modelChoice = await select({
         },
         {
             name: 'GLM-5',
-            value: 'glm-5-claude',
-            description: 'Remplace tous les modèles par glm-5-claude'
+            value: 'claude-glm-5',
+            description: 'Remplace tous les modèles par claude-glm-5'
         },
         {
             name: 'MiniMax M2.5',
-            value: 'minimax-m2.5-claude',
-            description: 'Remplace tous les modèles par minimax-m2.5-claude'
+            value: 'claude-minimax-m2.5',
+            description: 'Remplace tous les modèles par claude-minimax-m2.5'
         }
     ]
 });
@@ -436,8 +439,7 @@ console.log(chalk.green(`\n🚀 Launching Claude Code [${modelChoice}]...\n`));
 
 const child = spawn(claudeStatus.cliPath, args, {
     stdio: 'inherit',
-    env: env,
-    shell: process.platform === 'win32'
+    env: env
 });
 
 // 7. Cleanup Handlers
