@@ -41,7 +41,7 @@ L'objectif est d'offrir une couche d'exécution propre, isolée et professionnel
 ### 📌 Points clés
 
 - 🔒 **Isolation du jeton** — Le jeton d'authentification n'est jamais écrit sur le disque
-- 🔄 **Mapping de Modèles** — Redirection transparente vers **GLM-4.7** ou **MiniMax-M2.1** via proxy local
+- 🔄 **Mapping de Modèles** — Redirection transparente vers **claude-glm-5** ou **claude-minimax-m2.5** via proxy local
 - 💾 **Zéro persistance** — Aucun fichier temporaire ni configuration locale stockés
 - 🧩 **Compatibilité totale** — Fonctionne parfaitement avec la CLI officielle Claude Code
 - 🔐 **Stockage en mémoire uniquement** — Toutes les informations d'identification sont détruites à la fin du processus
@@ -102,8 +102,8 @@ npx claude-scionos
 2. Vous invite à saisir votre `ANTHROPIC_AUTH_TOKEN` et le valide instantanément
 3. **Menu de Sélection** : Vous choisissez la stratégie de modèle :
    - *Default* : Utilise les modèles Anthropic (Opus/Sonnet/Haiku)
-   - *Force GLM-4.7* : Mappe toutes les requêtes vers GLM-4.7
-   - *Force MiniMax-M2.1* : Mappe toutes les requêtes vers MiniMax-M2.1
+   - *GLM-5* : Mappe toutes les requêtes vers `claude-glm-5`
+   - *MiniMax M2.5* : Mappe toutes les requêtes vers `claude-minimax-m2.5`
 4. Lance Claude Code (avec un proxy local transparent si un mapping est choisi)
 5. Nettoie automatiquement les informations d'identification à la sortie
 

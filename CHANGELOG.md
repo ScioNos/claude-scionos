@@ -5,11 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.7] - 2026-03-23
+
+### Fixed
+- **Auto-Installation**: Replaced the broken `spawn.sync(...)` call with `spawnSync(...)` so Claude Code can be installed automatically when missing.
+- **Model Compatibility**: Updated GLM-5 and MiniMax M2.5 mappings to use the RouterLab model IDs `claude-glm-5` and `claude-minimax-m2.5`.
+- **Windows Warning**: Removed `shell: true` from child process launches to avoid the `DEP0190` deprecation warning.
+- **Test Stability**: Fixed the Windows detector test so it no longer depends on `PSModulePath` leaking from the host environment.
+
+### Changed
+- **Packaging**: Limited published npm files to the runtime assets and removed `update-notifier` from runtime dependencies to keep the CLI ephemeral.
+- **Documentation**: Updated the README files to match the current model strategy names and RouterLab identifiers.
+
 ## [3.0.6] - 2026-03-17
 
 ### Fixed
 - **Proxy Connectivity**: Replaced `undici` with native `node:https` module to fix "Cannot find package 'undici'" and "fetch failed" errors.
-- **Model Compatibility**: Updated GLM-5 and MiniMax to use `-claude` suffix (`glm-5-claude`, `minimax-m2.5-claude`) for Anthropic format compatibility.
+- **Model Compatibility**: Updated GLM-5 and MiniMax to use the Anthropic-compatible proxy model IDs available at the time.
 - **Error Handling**: Improved error logging with detailed error codes and causes for easier debugging.
 
 ### Improved
@@ -151,6 +163,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Environment variable isolation
 
 [3.0.6]: https://github.com/ScioNos/claude-scionos/compare/v3.0.5...v3.0.6
+[3.0.7]: https://github.com/ScioNos/claude-scionos/compare/v3.0.6...v3.0.7
 [3.0.5]: https://github.com/ScioNos/claude-scionos/compare/v3.0.4...v3.0.5
 [3.0.4]: https://github.com/ScioNos/claude-scionos/compare/v3.0.3...v3.0.4
 [3.0.3]: https://github.com/ScioNos/claude-scionos/compare/v3.0.2...v3.0.3

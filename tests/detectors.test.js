@@ -29,6 +29,7 @@ describe('System Detectors', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       vi.mocked(os.arch).mockReturnValue('x64');
       Object.defineProperty(process, 'platform', { value: 'win32' });
+      delete process.env.PSModulePath;
       process.env.WINDIR = 'C:\\Windows'; // Simulate CMD
 
       const result = detectOS();

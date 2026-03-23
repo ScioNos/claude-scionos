@@ -6,4 +6,6 @@ yarn-error.log
 coverage/
 dist/
 .internal/
+.npm-cache/
+.tmp-home/
 
