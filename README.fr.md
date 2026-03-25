@@ -32,7 +32,7 @@ _[🇬🇧 Read in English](./README.md)_
 
 ### 🛡️ Présentation
 
-**claude-scionos** est un exécuteur éphémère et sécurisé pour la CLI officielle [Claude Code](https://github.com/anthropics/claude-code). Il initialise toutes les variables d'environnement nécessaires **directement en mémoire**, garantissant qu'aucun fichier de configuration ni aucune donnée d'authentification n'est jamais écrit sur le disque.
+**claude-scionos** est un exécuteur sécurisé pour la CLI officielle [Claude Code](https://github.com/anthropics/claude-code). Il initialise les variables d'environnement requises pour l'environnement ScioNos au lancement et conserve les données d'authentification en mémoire de processus pendant l'exécution.
 
 L'objectif est d'offrir une couche d'exécution propre, isolée et professionnelle, entièrement compatible avec Claude Code, spécifiquement conçue pour **l'environnement ScioNos**.
 
@@ -40,11 +40,10 @@ L'objectif est d'offrir une couche d'exécution propre, isolée et professionnel
 
 ### 📌 Points clés
 
-- 🔒 **Isolation du jeton** — Le jeton d'authentification n'est jamais écrit sur le disque
-- 🔄 **Mapping de Modèles** — Redirection transparente vers **claude-glm-5** ou **claude-minimax-m2.5** via proxy local
-- 💾 **Zéro persistance** — Aucun fichier temporaire ni configuration locale stockés
-- 🧩 **Compatibilité totale** — Fonctionne parfaitement avec la CLI officielle Claude Code
-- 🔐 **Stockage en mémoire uniquement** — Toutes les informations d'identification sont détruites à la fin du processus
+- 🔒 **Isolation du jeton** — Le jeton est fourni au lancement et conservé en mémoire pendant l'exécution
+- 🔄 **Mapping de modèles** — Redirection transparente vers les stratégies de modèles ScioNos prises en charge via un proxy local
+- 🧩 **Compatibilité totale** — Fonctionne avec la CLI officielle Claude Code
+- 🔐 **Identifiants limités à la session** — Les identifiants sont prévus pour l'exécution en cours et nettoyés à la fin du processus
 - 🚀 **Démarrage rapide** — Exécution en une seule commande via `npx`
 
 ---
@@ -102,6 +101,7 @@ npx claude-scionos
 2. Vous invite à saisir votre `ANTHROPIC_AUTH_TOKEN` et le valide instantanément
 3. **Menu de Sélection** : Vous choisissez la stratégie de modèle :
    - *Default* : Utilise les modèles Anthropic (Opus/Sonnet/Haiku)
+   - *Claude AWS* : Mappe les requêtes Claude vers la stratégie AWS proposée par ScioNos
    - *GLM-5* : Mappe toutes les requêtes vers `claude-glm-5`
    - *MiniMax M2.5* : Mappe toutes les requêtes vers `claude-minimax-m2.5`
 4. Lance Claude Code (avec un proxy local transparent si un mapping est choisi)
@@ -143,9 +143,8 @@ Vous pouvez utiliser n'importe quel flag ou commande Claude Code, comme :
 - `npx claude-scionos --model opus "expliquer ce code"`
 - `npx claude-scionos --verbose --continue`
 - `npx claude-scionos -p --output-format json "requête"`
-- `npx claude-scionos --chrome --agents '{"reviewer":{...}}'`
 
-Pour une liste complète des flags et commandes disponibles, consultez la [documentation officielle de la CLI Claude Code](https://code.claude.com/docs/cli-reference).
+Pour les flags et sous-commandes avancés, référez-vous à la version installée de la CLI Claude Code disponible dans votre environnement.
 
 ---
 
@@ -156,10 +155,10 @@ Pour une liste complète des flags et commandes disponibles, consultez la [docum
 3. **Configuration de l'environnement** : Crée des variables d'environnement isolées :
    - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
    - `ANTHROPIC_AUTH_TOKEN` → Votre jeton (mémoire uniquement)
-4. **Exécution** : Lance le processus Claude Code avec l'environnement personnalisé
-5. **Nettoyage** : Détruit automatiquement les informations d'identification à la sortie
+4. **Exécution** : Lance Claude Code avec l'environnement préparé et démarre un proxy local lorsqu'une stratégie mappée est sélectionnée
+5. **Nettoyage** : Efface les identifiants conservés en mémoire à la fin du processus
 
-**Aucun fichier créé. Aucune donnée persistée.**
+Le wrapper est conçu pour limiter les identifiants à l'exécution en cours et éviter d'écrire ses propres fichiers de configuration spécifiques au projet.
 
 ---
 
@@ -169,9 +168,10 @@ Bien que `claude-scionos` assure une sécurité maximale en conservant les jeton
 
 ⚠️ **Notes importantes :**
 
-- Les jetons ne sont **jamais écrits sur le disque**
+- Les jetons sont destinés à rester en mémoire de processus pendant l'exécution
+- Le comportement réel dépend aussi de la CLI Claude Code sous-jacente et des dépendances installées sur la machine hôte
 - Les dumps mémoire ou débogueurs pourraient potentiellement exposer le jeton pendant l'exécution du processus
-- Les jetons sont automatiquement effacés à la fin du processus
+- Les jetons sont effacés à la fin du processus
 - **Utiliser uniquement dans des environnements de confiance**
 
 ✅ **Bonnes pratiques :**

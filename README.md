@@ -32,7 +32,7 @@ _[🇫🇷 Lire en français](./README.fr.md)_
 
 ### 🛡️ Overview
 
-**claude-scionos** is an ephemeral and secure runner for the official [Claude Code](https://github.com/anthropics/claude-code) CLI. It initializes all required environment variables **directly in memory**, ensuring that no configuration files or authentication data are ever written to disk.
+**claude-scionos** is a secure runner for the official [Claude Code](https://github.com/anthropics/claude-code) CLI. It initializes the required environment variables for the ScioNos environment at launch and keeps authentication data in process memory during execution.
 
 The goal is to offer a clean, isolated, and professional execution layer fully compatible with Claude Code, specifically designed for the **ScioNos environment**.
 
@@ -40,11 +40,10 @@ The goal is to offer a clean, isolated, and professional execution layer fully c
 
 ### 📌 Key Features
 
-- 🔒 **Token Isolation** — Authentication token never written to disk
-- 🔄 **Model Mapping** — Transparently route requests to **claude-glm-5** or **claude-minimax-m2.5** via local proxy
-- 💾 **Zero Persistence** — No temporary files or local configuration stored
+- 🔒 **Token Isolation** — Authentication token is provided at launch and kept in memory during execution
+- 🔄 **Model Mapping** — Transparently route requests to supported ScioNos model strategies via local proxy
 - 🧩 **Full Compatibility** — Works seamlessly with the official Claude Code CLI
-- 🔐 **Memory-Only Storage** — All credentials destroyed on process exit
+- 🔐 **Session-Scoped Credentials** — Credentials are intended for the current run and cleared when the process exits
 - 🚀 **Quick Start** — Single command execution via `npx`
 
 ---
@@ -102,6 +101,7 @@ npx claude-scionos
 2.  Prompts for your `ANTHROPIC_AUTH_TOKEN` and validates it instantly
 3.  **Selection Menu**: Choose your model strategy:
     - *Default*: Use standard Anthropic models (Opus/Sonnet/Haiku)
+    - *Claude AWS*: Maps Claude requests to the ScioNos AWS-backed strategy
     - *GLM-5*: Maps all requests to `claude-glm-5`
     - *MiniMax M2.5*: Maps all requests to `claude-minimax-m2.5`
 4.  Launches Claude Code (starting a transparent local proxy if needed)
@@ -131,9 +131,8 @@ You can use any Claude Code flag or command, such as:
 - `npx claude-scionos --model opus "explain this code"`
 - `npx claude-scionos --verbose --continue`
 - `npx claude-scionos -p --output-format json "query"`
-- `npx claude-scionos --chrome --agents '{"reviewer":{...}}'`
 
-For a complete list of available flags and commands, see the [official Claude Code CLI documentation](https://code.claude.com/docs/cli-reference).
+For advanced flags and subcommands, refer to the installed Claude Code CLI version available in your environment.
 
 ---
 
@@ -144,10 +143,10 @@ For a complete list of available flags and commands, see the [official Claude Co
 3. **Environment Setup**: Creates isolated environment variables:
    - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
    - `ANTHROPIC_AUTH_TOKEN` → Your token (memory only)
-4. **Execution**: Spawns Claude Code process with custom environment
-5. **Cleanup**: Automatically destroys credentials on exit
+4. **Execution**: Launches Claude Code with the prepared environment and starts a local proxy when a mapped strategy is selected
+5. **Cleanup**: Clears in-memory credentials when the process exits
 
-**No files are created. No data persists.**
+The wrapper is designed to keep credentials scoped to the current run and avoid writing its own project-specific configuration files.
 
 ---
 
@@ -157,9 +156,10 @@ While `claude-scionos` ensures maximum security by keeping tokens in memory only
 
 ⚠️ **Important Notes:**
 
-- Tokens are **never written to disk**
+- Tokens are intended to stay in process memory during execution
+- Runtime behavior also depends on the underlying Claude Code CLI and installed dependencies on the host machine
 - Memory dumps or debuggers could potentially expose the token while the process runs
-- Tokens are automatically cleared when the process terminates
+- Tokens are cleared when the process terminates
 - **Use only in trusted environments**
 
 ✅ **Best Practices:**

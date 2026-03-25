@@ -1,6 +1,6 @@
 {
     "name": "claude-scionos",
-    "version": "3.0.6",
+    "version": "3.1.0",
     "description": "Ephemeral and secure runner for Claude Code CLI in ScioNos environment",
     "type": "module",
     "main": "index.js",
@@ -36,13 +36,14 @@
     "private": false,
     "dependencies": {
         "@inquirer/prompts": "^8.3.2",
+        "claude-scionos": "^3.1.0",
         "update-notifier": "^7.3.1",
         "which": "^6.0.1"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "eslint": "^10.0.3",
+        "eslint": "^10.1.0",
         "globals": "^17.4.0",
-        "vitest": "^4.1.0"
+        "vitest": "^4.1.1"
     }
 }

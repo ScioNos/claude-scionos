@@ -5,17 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.0.7] - 2026-03-23
-
-### Fixed
-- **Auto-Installation**: Replaced the broken `spawn.sync(...)` call with `spawnSync(...)` so Claude Code can be installed automatically when missing.
-- **Model Compatibility**: Updated GLM-5 and MiniMax M2.5 mappings to use the RouterLab model IDs `claude-glm-5` and `claude-minimax-m2.5`.
-- **Windows Warning**: Removed `shell: true` from child process launches to avoid the `DEP0190` deprecation warning.
-- **Test Stability**: Fixed the Windows detector test so it no longer depends on `PSModulePath` leaking from the host environment.
+## [3.1.0] - 2026-03-25
 
 ### Changed
-- **Packaging**: Limited published npm files to the runtime assets and removed `update-notifier` from runtime dependencies to keep the CLI ephemeral.
-- **Documentation**: Updated the README files to match the current model strategy names and RouterLab identifiers.
+- **Versioning**: Aligned the published package metadata on `3.1.0` to match the current working state.
+- **Documentation**: Reviewed the README files and internal guidance to remove outdated release claims and keep the project description consistent with the current repository state.
+
+### Cleaned
+- **Repository**: Removed unused root assets and other non-essential release leftovers.
+
+## [3.0.7] - 2026-03-23
+
+### Changed
+- **Documentation**: Updated the README files to reflect the RouterLab model identifiers `claude-glm-5` and `claude-minimax-m2.5`.
+- **Tests**: Stabilized the Windows detector test suite against host environment leakage.
+
+### Cleaned
+- **Repository**: Reduced temporary/release noise around the package contents and project workspace.
 
 ## [3.0.6] - 2026-03-17
 
@@ -162,6 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic credential cleanup on exit
 - Environment variable isolation
 
+[3.1.0]: https://github.com/ScioNos/claude-scionos/compare/v3.0.7...v3.1.0
 [3.0.6]: https://github.com/ScioNos/claude-scionos/compare/v3.0.5...v3.0.6
 [3.0.7]: https://github.com/ScioNos/claude-scionos/compare/v3.0.6...v3.0.7
 [3.0.5]: https://github.com/ScioNos/claude-scionos/compare/v3.0.4...v3.0.5
