@@ -1,295 +1,134 @@
-# Claude Code (via ScioNos)
+# Claude Code for RouterLab
 
-<div align="center">
-
-[![npm version](https://img.shields.io/npm/v/claude-scionos.svg?style=flat-square)](https://www.npmjs.com/package/claude-scionos)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
-[![Node Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen?style=flat-square)](https://nodejs.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/ScioNos/claude-scionos/pulls)
-
-**Ephemeral and secure runner for Claude Code CLI**
+`claude-scionos` is a RouterLab launcher for the official Claude Code CLI. It keeps the normal Claude Code workflow, while adding guided onboarding, strategy routing, secure token storage, and a `doctor` command for client support.
 
 _[🇫🇷 Lire en français](./README.fr.md)_
 
-</div>
+## Highlights
 
----
+- Guided launch for first-time users
+- `--strategy` to preselect a routing strategy
+- `--no-prompt` for automation and CI
+- `--list-strategies` to inspect available routes
+- `doctor` to diagnose local setup quickly
+- `auth login|status|change|logout|test` for secure token management
+- Local proxy only when a mapped strategy is selected
 
-### 📖 Table of Contents
+## Requirements
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [How It Works](#how-it-works)
-- [Security Considerations](#security-considerations)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+- Node.js 22 or later
+- A RouterLab token from [routerlab.ch/keys](https://routerlab.ch/keys)
+- On Windows, Git Bash must be installed for Claude Code
 
----
+## Installation
 
-### 🛡️ Overview
-
-**claude-scionos** is a secure runner for the official [Claude Code](https://github.com/anthropics/claude-code) CLI. It initializes the required environment variables for the ScioNos environment at launch and keeps authentication data in process memory during execution.
-
-The goal is to offer a clean, isolated, and professional execution layer fully compatible with Claude Code, specifically designed for the **ScioNos environment**.
-
----
-
-### 📌 Key Features
-
-- 🔒 **Token Isolation** — Authentication token is provided at launch and kept in memory during execution
-- 🔄 **Model Mapping** — Transparently route requests to supported ScioNos model strategies via local proxy
-- 🧩 **Full Compatibility** — Works seamlessly with the official Claude Code CLI
-- 🔐 **Session-Scoped Credentials** — Credentials are intended for the current run and cleared when the process exits
-- 🚀 **Quick Start** — Single command execution via `npx`
-
----
-
-### ⚙️ Requirements
-
-Before using `claude-scionos`, ensure you have:
-
-- **Node.js** version 22 or later ([Download](https://nodejs.org/))
-- A valid **ANTHROPIC_AUTH_TOKEN** from [https://routerlab.ch/keys](https://routerlab.ch/keys)
-
-*(Note: If **Claude Code** is not installed, the tool will offer to install it for you automatically.)*
-
----
-
-### 📥 Installation
-
-#### Option 1: Direct Execution (Recommended)
-
-No installation required! Run directly with `npx`:
+Run directly with `npx`:
 
 ```bash
 npx claude-scionos
 ```
 
-#### Option 2: Global Installation
-
-For frequent use, install globally:
+Or install globally:
 
 ```bash
 npm install -g claude-scionos
-```
-
-Then run:
-
-```bash
 claude-scionos
 ```
 
----
+## Quick Start
 
-### 🚀 Usage
-
-#### Basic Usage
-
-Run the command:
+Guided mode:
 
 ```bash
 npx claude-scionos
 ```
 
-**What happens:**
-
-1.  Checks if Claude Code CLI is installed (if not, offers **automatic installation**)
-2.  Prompts for your `ANTHROPIC_AUTH_TOKEN` and validates it instantly
-3.  **Selection Menu**: Choose your model strategy:
-    - *Default*: Use standard Anthropic models (Opus/Sonnet/Haiku)
-    - *Claude AWS*: Maps Claude requests to the ScioNos AWS-backed strategy
-    - *GLM-5*: Maps all requests to `claude-glm-5`
-    - *MiniMax M2.5*: Maps all requests to `claude-minimax-m2.5`
-4.  Launches Claude Code (starting a transparent local proxy if needed)
-5.  Automatically cleans credentials on exit
-
-#### Debugging
-
-If you encounter issues, you can run with the debug flag to see detailed diagnostic information:
+Useful commands:
 
 ```bash
-npx claude-scionos --scionos-debug
+npx claude-scionos --list-strategies
+npx claude-scionos doctor
+npx claude-scionos auth login
+npx claude-scionos auth test
+npx claude-scionos --strategy aws
+npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 ```
 
-#### Command Line Options
+## Strategies
+
+- `default`: use Claude Code normally without the local proxy
+- `aws`: remap Claude model families to RouterLab AWS-backed Claude variants
+- `claude-glm-5`: force all requests to `claude-glm-5`
+- `claude-minimax-m2.5`: force all requests to `claude-minimax-m2.5`
+
+Use `--list-strategies` to see the current labels and live availability when a token is available.
+
+## Token Handling
+
+Token resolution order:
+
+1. `ANTHROPIC_AUTH_TOKEN`
+2. Secure local storage from `claude-scionos auth login`
+3. Manual prompt in guided mode
+
+Secure storage backends:
+
+- Windows: DPAPI-encrypted local file bound to the current user
+- macOS: Keychain
+- Linux: Secret Service via `secret-tool`
+
+Manage the token with:
 
 ```bash
-# Display version
-npx claude-scionos --version
-npx claude-scionos -v
+claude-scionos auth login
+claude-scionos auth status
+claude-scionos auth change
+claude-scionos auth logout
+claude-scionos auth test
 ```
 
-#### Full Claude Code Compatibility
+## What `--strategy` and `--no-prompt` mean
 
-**`claude-scionos` is a transparent wrapper** — it accepts **all flags and commands** supported by the official Claude Code CLI.
+- `--strategy <value>` skips the interactive strategy menu and selects the route directly
+- `--no-prompt` disables every interactive question
 
-You can use any Claude Code flag or command, such as:
-- `npx claude-scionos --model opus "explain this code"`
-- `npx claude-scionos --verbose --continue`
-- `npx claude-scionos -p --output-format json "query"`
+When `--no-prompt` is used, the launcher must already have a token from `ANTHROPIC_AUTH_TOKEN` or secure storage.
 
-For advanced flags and subcommands, refer to the installed Claude Code CLI version available in your environment.
+## Doctor
 
----
+`claude-scionos doctor` checks the local setup and prints a support-friendly summary:
 
-### 🔍 How It Works
+- platform and Node.js
+- Claude Code installation
+- Git Bash on Windows
+- secure storage backend
+- stored or environment token presence
+- RouterLab token validation when a token is available
 
-1. **Verification**: Checks if `claude` command is available in your PATH
-2. **Token Validation**: Prompts for and validates your token in real-time via the API (ensuring it works before launch)
-3. **Environment Setup**: Creates isolated environment variables:
-   - `ANTHROPIC_BASE_URL` → `https://routerlab.ch`
-   - `ANTHROPIC_AUTH_TOKEN` → Your token (memory only)
-4. **Execution**: Launches Claude Code with the prepared environment and starts a local proxy when a mapped strategy is selected
-5. **Cleanup**: Clears in-memory credentials when the process exits
+## Compatibility
 
-The wrapper is designed to keep credentials scoped to the current run and avoid writing its own project-specific configuration files.
+The wrapper forwards regular Claude Code flags and arguments. The local proxy is only started for mapped strategies. `default` launches Claude Code without the proxy layer.
 
----
+## Troubleshooting
 
-### 🔐 Security Considerations
+`claude-scionos doctor` should be the first command to run when a client reports an issue.
 
-While `claude-scionos` ensures maximum security by keeping tokens in memory only, please be aware:
+Common cases:
 
-⚠️ **Important Notes:**
+- `Claude Code CLI not found`: install `@anthropic-ai/claude-code`
+- `Git Bash is required on Windows`: install Git for Windows
+- `ANTHROPIC_AUTH_TOKEN ... is required when using --no-prompt`: set the environment variable or store the token first
+- `secret-tool not found`: install a Secret Service client on Linux or rely on the environment variable
 
-- Tokens are intended to stay in process memory during execution
-- Runtime behavior also depends on the underlying Claude Code CLI and installed dependencies on the host machine
-- Memory dumps or debuggers could potentially expose the token while the process runs
-- Tokens are cleared when the process terminates
-- **Use only in trusted environments**
-
-✅ **Best Practices:**
-
-- Never share your `ANTHROPIC_AUTH_TOKEN` with others
-- Retrieve a fresh token for each session from [https://routerlab.ch/keys](https://routerlab.ch/keys)
-- Avoid running on shared/untrusted systems
-- Use for local development or secure CI/CD pipelines
-
----
-
-### 🛠️ Troubleshooting
-
-#### Error: 'claude' command not found
-
-**Problem:** Claude Code CLI is not installed or not in PATH.
-
-**Solution:**
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-Verify installation:
-```bash
-claude --version
-```
-
----
-
-#### Windows: Git Bash not found
-
-**Problem:** On Windows, Claude Code requires git-bash to run. If you see an error after entering your token, or if `claude-scionos` exits with a Git Bash warning, this is the issue.
-
-**Solution:**
-
-1. **Install Git for Windows** (includes Git Bash):
-
-   Download from: [https://git-scm.com/downloads/win](https://git-scm.com/downloads/win)
-
-2. **Alternative:** If Git Bash is already installed but not detected, set the environment variable:
-
-   ```bash
-   # Windows Command Prompt
-   set CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe
-
-   # Windows PowerShell
-   $env:CLAUDE_CODE_GIT_BASH_PATH="C:\Program Files\Git\bin\bash.exe"
-   ```
-
-3. **Restart your terminal** and run again:
-
-   ```bash
-   npx claude-scionos
-   ```
-
-**Note:** Git Bash is automatically included when you install Git for Windows. After installation, `claude-scionos` will detect it automatically.
-
----
-
-#### Token authentication fails
-
-**Problem:** Invalid or expired token.
-
-**Solution:**
-1. Get a fresh token from [https://routerlab.ch/keys](https://routerlab.ch/keys)
-2. Ensure you're copying the complete token (no extra spaces)
-3. Check your network connection to `routerlab.ch`
-
----
-
-#### Node.js version error
-
-**Problem:** Node.js version is below 22.
-
-**Solution:**
-```bash
-# Check your Node version
-node --version
-
-# Upgrade Node.js to version 22 or later
-# Visit: https://nodejs.org/
-```
-
----
-
-### 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. **Report Bugs** — [Open an issue](https://github.com/ScioNos/claude-scionos/issues)
-2. **Suggest Features** — Share your ideas via issues
-3. **Submit PRs** — Fork, create a branch, and submit a pull request
-
-**Development Setup:**
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/ScioNos/claude-scionos.git
-cd claude-scionos
-
-# Install dependencies
 npm install
-
-# Test locally
+npm test
+npm run lint
 node index.js
 ```
 
----
+## License
 
-### 📝 License
-
-MIT License — © 2025 [ScioNos](https://scionos.ch)
-
-See [LICENSE](./LICENSE) file for details.
-
----
-
-### 🔗 Links
-
-- **Homepage:** [https://scionos.ch](https://scionos.ch)
-- **npm Package:** [https://www.npmjs.com/package/claude-scionos](https://www.npmjs.com/package/claude-scionos)
-- **Issues:** [https://github.com/ScioNos/claude-scionos/issues](https://github.com/ScioNos/claude-scionos/issues)
-- **Claude Code:** [https://github.com/anthropics/claude-code](https://github.com/anthropics/claude-code)
-
----
-
-<div align="center">
-
-**Made with ❤️ by ScioNos**
-
-[⬆ Back to Top](#claude-code-via-scionos)
-
-</div>
+MIT. See [LICENSE](./LICENSE).

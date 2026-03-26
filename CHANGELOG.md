@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-03-26
+
+### ⚠️ BREAKING CHANGES
+- **Reserved Wrapper Commands**: `doctor` and `auth` are now handled by `claude-scionos` itself instead of being forwarded as plain first-position arguments to Claude Code.
+- **Reserved Wrapper Flags**: `--strategy`, `--no-prompt`, and `--list-strategies` are now first-class launcher flags owned by the wrapper.
+- **Release Positioning**: The package is now documented and packaged as a RouterLab launcher with its own client-facing command surface, not only as a thin pass-through wrapper.
+
+### Added
+- **Secure Token Storage**: Added cross-platform secure token management with `auth login`, `auth status`, `auth change`, `auth logout`, and `auth test`.
+- **Non-Interactive Launch**: Added `--strategy` and `--no-prompt` for scripted launches, CI usage, and customer support workflows.
+- **Diagnostics**: Added `doctor` to validate local prerequisites, Git Bash on Windows, secure storage support, and RouterLab token availability.
+- **Strategy Discovery**: Added `--list-strategies`, live availability checks, and fallback logic when a mapped strategy is unavailable.
+- **Client UX**: Added embedded quick-start help, launch summaries, and clearer strategy metadata in the interactive flow.
+
+### Changed
+- **Architecture**: Refactored the single-file launcher into an orchestrator plus dedicated `src/proxy.js` and `src/routerlab.js` modules.
+- **Branding**: Kept the original banner style while expanding the client-oriented CLI flow around RouterLab support and model routing.
+- **Packaging**: Limited published npm contents with a `files` whitelist, aligned package metadata with RouterLab, and added explicit `.npmignore` guidance.
+- **Testing**: Expanded runtime coverage around proxy headers, model mapping, strategy readiness, and fallback behavior.
+
+### Fixed
+- **Proxy Transparency**: Preserved upstream Claude Code headers more faithfully, removed fragile header rebuilding, and recalculated request metadata after model swapping.
+- **Bootstrap Side Effects**: Removed automatic update-notifier behavior that introduced hidden persistence and import-time side effects.
+- **Manifest Integrity**: Removed the invalid self-dependency and cleaned release metadata to avoid broken installs and inconsistent published state.
+- **Windows Reliability**: Stabilized the CLI and test flow on Windows by using a thread-based Vitest pool and keeping the terminal UI layout closer to the original working design.
+
+### Documentation
+- **README**: Rewrote the English and French READMEs around RouterLab usage, secure token storage, `doctor`, automation-friendly flags, and support flows.
+- **Changelog**: Rebased release notes to reflect the actual product surface delivered in this release.
+
 ## [3.1.0] - 2026-03-25
 
 ### Changed
@@ -168,6 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic credential cleanup on exit
 - Environment variable isolation
 
+[4.0.0]: https://github.com/ScioNos/claude-scionos/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/ScioNos/claude-scionos/compare/v3.0.7...v3.1.0
 [3.0.6]: https://github.com/ScioNos/claude-scionos/compare/v3.0.5...v3.0.6
 [3.0.7]: https://github.com/ScioNos/claude-scionos/compare/v3.0.6...v3.0.7

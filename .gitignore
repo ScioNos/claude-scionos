@@ -7,5 +7,6 @@ coverage/
 dist/
 .internal/
 .npm-cache/
+.npm-pack-cache/
 .tmp-home/
 
