@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { styleText } from 'node:util';
+import fs from 'node:fs';
+import path from 'node:path';
 const chalk = {
     hex: (color) => {
         if (color === '#3b82f6') return (t) => styleText('blueBright', t);
@@ -45,6 +47,21 @@ import { buildProxyRequestOptions, normalizeProxyHeaders, startProxyServer } fro
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
+
+function normalizeEntrypointPath(candidate) {
+    if (!candidate) {
+        return null;
+    }
+
+    const resolved = path.resolve(candidate);
+
+    try {
+        const realPath = fs.realpathSync.native?.(resolved) ?? fs.realpathSync(resolved);
+        return process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+    } catch {
+        return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    }
+}
 
 // --- UTILS ---
 
@@ -645,7 +662,7 @@ async function main() {
     });
 }
 
-const isEntrypoint = process.argv[1] === fileURLToPath(import.meta.url);
+const isEntrypoint = normalizeEntrypointPath(process.argv[1]) === normalizeEntrypointPath(fileURLToPath(import.meta.url));
 
 if (isEntrypoint) {
     main().catch((err) => {
@@ -659,6 +676,7 @@ export {
     canProceedWithValidation,
     installClaudeCode,
     main,
+    normalizeEntrypointPath,
     normalizeProxyHeaders,
     startProxyServer,
     validateToken

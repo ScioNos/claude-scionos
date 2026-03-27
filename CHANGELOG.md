@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2026-03-27
+
+### Fixed
+- **Global npm Invocation on Windows**: Fixed silent exits when `claude-scionos` was launched through the npm global shim or `npx` with a relative script path, for example `claude-scionos --version` or `claude-scionos doctor`.
+- **Entrypoint Detection**: Normalized CLI entrypoint path resolution so the wrapper consistently executes `main()` when started through Windows `.cmd`/PowerShell shims.
+
 ## [4.0.0] - 2026-03-26
 
 ### ⚠️ BREAKING CHANGES
@@ -198,6 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic credential cleanup on exit
 - Environment variable isolation
 
+[4.0.1]: https://github.com/ScioNos/claude-scionos/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/ScioNos/claude-scionos/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/ScioNos/claude-scionos/compare/v3.0.7...v3.1.0
 [3.0.6]: https://github.com/ScioNos/claude-scionos/compare/v3.0.5...v3.0.6

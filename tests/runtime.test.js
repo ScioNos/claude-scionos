@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import path from 'node:path';
 import { assessStrategy, getFallbackStrategy } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
+import { normalizeEntrypointPath } from '../index.js';
 
 describe('proxy request handling', () => {
   it('keeps useful upstream headers while stripping hop-by-hop ones', () => {
@@ -66,5 +68,15 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('claude-glm-5', ['claude-glm-5'])).toBe('claude-glm-5');
     expect(getFallbackStrategy('claude-glm-5', ['claude-minimax-m2.5'])).toBe('default');
     expect(getFallbackStrategy('aws', null)).toBe('aws');
+  });
+});
+
+describe('entrypoint detection', () => {
+  it('normalizes relative Windows-style script paths to the same file', () => {
+    const absolute = path.resolve('index.js');
+    const relative = path.relative(process.cwd(), absolute) || 'index.js';
+    const windowsRelative = relative.split(path.sep).join('\\');
+
+    expect(normalizeEntrypointPath(windowsRelative)).toBe(normalizeEntrypointPath(absolute));
   });
 });
