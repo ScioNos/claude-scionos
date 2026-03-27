@@ -1,0 +1,24 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\steph\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.7.0
+2 info using node@v25.8.2
+3 silly config load:file:C:\Users\steph\AppData\Roaming\npm\node_modules\npm\npmrc
+4 silly config load:file:D:\Serveurs\Projet_ScioNos\claude-scionos\.tmp-global\.npmrc
+5 silly config load:file:C:\Users\steph\.npmrc
+6 silly config load:file:D:\Serveurs\Projet_ScioNos\claude-scionos\.tmp-global\etc\npmrc
+7 verbose title npm install .
+8 verbose argv "install" "--prefix" ".\\.tmp-global" "." "--cache" ".\\.npm-install-cache"
+9 verbose logfile logs-max:10 dir:D:\Serveurs\Projet_ScioNos\claude-scionos\.npm-install-cache\_logs\2026-03-27T16_27_52_089Z-
+10 verbose logfile D:\Serveurs\Projet_ScioNos\claude-scionos\.npm-install-cache\_logs\2026-03-27T16_27_52_089Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 http fetch GET https://registry.npmjs.org/npm attempt 1 failed with ECONNREFUSED
+14 silly idealTree buildDeps
+15 silly placeDep ROOT claude-scionos@4.0.0 OK for:  want: file:..
+16 silly reify moves {}
+17 silly ADD node_modules/claude-scionos
+18 verbose cwd D:\Serveurs\Projet_ScioNos\claude-scionos
+19 verbose os Windows_NT 10.0.26200
+20 verbose node v25.8.2
+21 verbose npm  v11.7.0
+22 verbose exit 0
+23 info ok
