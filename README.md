@@ -8,6 +8,7 @@ _[🇫🇷 Lire en français](./README.fr.md)_
 
 - Guided launch for first-time users
 - `--strategy` to preselect a routing strategy
+- `--service llm` for invitation-only RouterLab LLM access
 - `--no-prompt` for automation and CI
 - `--list-strategies` to inspect available routes
 - `doctor` to diagnose local setup quickly
@@ -18,6 +19,7 @@ _[🇫🇷 Lire en français](./README.fr.md)_
 
 - Node.js 22 or later
 - A RouterLab token from [routerlab.ch/keys](https://routerlab.ch/keys)
+- Or an invitation token for `--service llm`
 - On Windows, Git Bash must be installed for Claude Code
 
 ## Installation
@@ -49,10 +51,20 @@ Useful commands:
 npx claude-scionos --list-strategies
 npx claude-scionos doctor
 npx claude-scionos auth login
+npx claude-scionos auth login --service llm
 npx claude-scionos auth test
 npx claude-scionos --strategy aws
+npx claude-scionos --service llm --strategy claude-glm-5
 npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 ```
+
+## Services
+
+- Default behavior uses `https://routerlab.ch`
+- `--service llm` switches the launcher to `https://llm.routerlab.ch`
+- `llm` is intended for invitation-only access
+- Tokens stored with `auth login --service llm` are kept separate from the default RouterLab token
+- `llm` currently exposes `claude-glm-5` and `claude-gpt-5.4`
 
 ## Strategies
 
@@ -60,8 +72,9 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `aws`: remap Claude model families to RouterLab AWS-backed Claude variants
 - `claude-glm-5`: force all requests to `claude-glm-5`
 - `claude-minimax-m2.5`: force all requests to `claude-minimax-m2.5`
+- `claude-gpt-5.4`: force all requests to `claude-gpt-5.4`
 
-Use `--list-strategies` to see the current labels and live availability when a token is available.
+Use `--list-strategies` to see the strategies available for the selected service and their live availability when a token is available.
 
 ## Token Handling
 
@@ -69,7 +82,8 @@ Token resolution order:
 
 1. `ANTHROPIC_AUTH_TOKEN`
 2. Secure local storage from `claude-scionos auth login`
-3. Manual prompt in guided mode
+3. Service-specific secure local storage from `claude-scionos auth login --service llm`
+4. Manual prompt in guided mode
 
 Secure storage backends:
 
@@ -90,6 +104,7 @@ claude-scionos auth test
 ## What `--strategy` and `--no-prompt` mean
 
 - `--strategy <value>` skips the interactive strategy menu and selects the route directly
+- `--service <value>` switches between RouterLab targets. `routerlab` is the default and `llm` is invitation-only
 - `--no-prompt` disables every interactive question
 
 When `--no-prompt` is used, the launcher must already have a token from `ANTHROPIC_AUTH_TOKEN` or secure storage.

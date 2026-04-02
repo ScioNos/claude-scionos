@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-04-02
+
+### Added
+- **Invitation-Only LLM Service**: Added `--service llm` to target `https://llm.routerlab.ch` without changing the default RouterLab experience.
+- **Service-Aware Token Storage**: Added separate secure token storage and validation flows for the invitation-only LLM access.
+
+### Changed
+- **CLI UX**: Updated `auth`, `doctor`, `--list-strategies`, help output, and launch summaries to display the selected service target explicitly.
+- **Documentation**: Documented the new `llm` service in both English and French READMEs.
+
 ## [4.0.1] - 2026-03-27
 
 ### Fixed

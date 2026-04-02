@@ -8,6 +8,7 @@ _[🇬🇧 Read in English](./README.md)_
 
 - lancement guidé pour les nouveaux utilisateurs
 - `--strategy` pour choisir une stratégie sans menu
+- `--service llm` pour l'accès RouterLab LLM sur invitation
 - `--no-prompt` pour l'automatisation et la CI
 - `--list-strategies` pour voir les routes disponibles
 - `doctor` pour diagnostiquer rapidement un poste client
@@ -18,6 +19,7 @@ _[🇬🇧 Read in English](./README.md)_
 
 - Node.js 22 ou plus
 - un token RouterLab depuis [routerlab.ch/keys](https://routerlab.ch/keys)
+- ou un token d'invitation pour `--service llm`
 - sous Windows, Git Bash doit être installé pour Claude Code
 
 ## Installation
@@ -49,10 +51,20 @@ Commandes utiles :
 npx claude-scionos --list-strategies
 npx claude-scionos doctor
 npx claude-scionos auth login
+npx claude-scionos auth login --service llm
 npx claude-scionos auth test
 npx claude-scionos --strategy aws
+npx claude-scionos --service llm --strategy claude-glm-5
 npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 ```
+
+## Services
+
+- le comportement par défaut utilise `https://routerlab.ch`
+- `--service llm` bascule le lanceur vers `https://llm.routerlab.ch`
+- `llm` est prévu pour un accès sur invitation
+- les tokens enregistrés avec `auth login --service llm` sont stockés séparément du token RouterLab par défaut
+- `llm` expose pour l'instant `claude-glm-5` et `claude-gpt-5.4`
 
 ## Stratégies
 
@@ -60,8 +72,9 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `aws` : remappe les familles de modèles Claude vers les variantes Claude AWS de RouterLab
 - `claude-glm-5` : force toutes les requêtes vers `claude-glm-5`
 - `claude-minimax-m2.5` : force toutes les requêtes vers `claude-minimax-m2.5`
+- `claude-gpt-5.4` : force toutes les requêtes vers `claude-gpt-5.4`
 
-Utilise `--list-strategies` pour voir les libellés actuels et la disponibilité réelle quand un token est disponible.
+Utilise `--list-strategies` pour voir les stratégies disponibles pour le service choisi et leur disponibilité réelle quand un token est disponible.
 
 ## Gestion du token
 
@@ -69,7 +82,8 @@ Ordre de résolution du token :
 
 1. `ANTHROPIC_AUTH_TOKEN`
 2. stockage local sécurisé via `claude-scionos auth login`
-3. saisie manuelle en mode guidé
+3. stockage local sécurisé spécifique au service via `claude-scionos auth login --service llm`
+4. saisie manuelle en mode guidé
 
 Backends de stockage sécurisés :
 
@@ -90,6 +104,7 @@ claude-scionos auth test
 ## Ce que veulent dire `--strategy` et `--no-prompt`
 
 - `--strategy <value>` évite le menu interactif et choisit directement la route
+- `--service <value>` change la cible RouterLab. `routerlab` reste le défaut et `llm` est réservé à l'accès sur invitation
 - `--no-prompt` désactive toutes les questions interactives
 
 Quand `--no-prompt` est utilisé, le lanceur doit déjà avoir un token via `ANTHROPIC_AUTH_TOKEN` ou via le stockage sécurisé.

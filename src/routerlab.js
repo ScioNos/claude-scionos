@@ -3,12 +3,40 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
-const BASE_URL = 'https://routerlab.ch';
-const TOKEN_HELP_URL = `${BASE_URL}/keys`;
+const SERVICES = {
+  routerlab: {
+    value: 'routerlab',
+    label: 'RouterLab',
+    availabilityLabel: 'RouterLab',
+    tokenPromptLabel: 'RouterLab',
+    baseUrl: 'https://routerlab.ch',
+    tokenHelpUrl: 'https://routerlab.ch/keys',
+    tokenHelpMessage: null,
+    secureStorageAccount: 'routerlab-token',
+    secureStorageLabel: 'RouterLab Token',
+    secureStorageFileName: 'routerlab-token.secure.txt',
+    strategyValues: ['default', 'aws', 'claude-glm-5', 'claude-minimax-m2.5'],
+  },
+  llm: {
+    value: 'llm',
+    label: 'LLM (invitation only)',
+    availabilityLabel: 'RouterLab LLM',
+    tokenPromptLabel: 'RouterLab LLM',
+    baseUrl: 'https://llm.routerlab.ch',
+    tokenHelpUrl: null,
+    tokenHelpMessage: 'Use the invitation token provided for RouterLab LLM.',
+    secureStorageAccount: 'routerlab-llm-token',
+    secureStorageLabel: 'RouterLab LLM Token',
+    secureStorageFileName: 'routerlab-llm-token.secure.txt',
+    strategyValues: ['claude-glm-5', 'claude-gpt-5.4'],
+  },
+};
+const DEFAULT_SERVICE = 'routerlab';
+const BASE_URL = SERVICES[DEFAULT_SERVICE].baseUrl;
+const TOKEN_HELP_URL = SERVICES[DEFAULT_SERVICE].tokenHelpUrl;
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
 const SECURE_STORAGE_SERVICE = 'claude-scionos';
-const SECURE_STORAGE_ACCOUNT = 'routerlab-token';
-const WINDOWS_TOKEN_FILE = path.join(os.homedir(), '.claude-scionos', 'routerlab-token.secure.txt');
+const SECURE_STORAGE_ACCOUNT = SERVICES[DEFAULT_SERVICE].secureStorageAccount;
 
 const STRATEGIES = [
   {
@@ -43,6 +71,13 @@ const STRATEGIES = [
     description: 'Forces all requests to claude-minimax-m2.5.',
     selectionDescription: 'Forces all requests to claude-minimax-m2.5.',
     mappedModels: ['claude-minimax-m2.5'],
+  },
+  {
+    value: 'claude-gpt-5.4',
+    name: 'GPT-5.4',
+    description: 'Forces all requests to claude-gpt-5.4.',
+    selectionDescription: 'Forces all requests to claude-gpt-5.4.',
+    mappedModels: ['claude-gpt-5.4'],
   },
 ];
 
@@ -128,12 +163,45 @@ function canProceedWithValidation(validation) {
   return validation.valid === true;
 }
 
-function findStrategy(strategyValue) {
-  return STRATEGIES.find((strategy) => strategy.value === strategyValue) ?? null;
+function normalizeServiceValue(serviceValue) {
+  return serviceValue?.trim()?.toLowerCase() || DEFAULT_SERVICE;
 }
 
-function assessStrategy(strategyValue, modelIds = []) {
-  const strategy = findStrategy(strategyValue);
+function getServiceConfig(serviceValue = DEFAULT_SERVICE) {
+  return SERVICES[normalizeServiceValue(serviceValue)] ?? null;
+}
+
+function getServiceLabel(serviceValue = DEFAULT_SERVICE) {
+  return getServiceConfig(serviceValue)?.availabilityLabel ?? 'RouterLab';
+}
+
+function getWindowsTokenFile(serviceValue = DEFAULT_SERVICE) {
+  const service = getServiceConfig(serviceValue);
+  if (!service) {
+    throw new Error(`Unknown service "${serviceValue}"`);
+  }
+
+  return path.join(os.homedir(), '.claude-scionos', service.secureStorageFileName);
+}
+
+function getServiceStrategies(serviceValue = DEFAULT_SERVICE) {
+  const service = getServiceConfig(serviceValue);
+  if (!service?.strategyValues?.length) {
+    return [];
+  }
+
+  return service.strategyValues
+    .map((strategyValue) => STRATEGIES.find((strategy) => strategy.value === strategyValue) ?? null)
+    .filter(Boolean);
+}
+
+function findStrategy(strategyValue, serviceValue = DEFAULT_SERVICE) {
+  return getServiceStrategies(serviceValue).find((strategy) => strategy.value === strategyValue) ?? null;
+}
+
+function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
+  const serviceLabel = getServiceLabel(serviceValue);
+  const strategy = findStrategy(strategyValue, serviceValue);
   if (!strategy) {
     return {
       available: false,
@@ -168,7 +236,7 @@ function assessStrategy(strategyValue, modelIds = []) {
     return {
       available: true,
       level: 'ready',
-      note: 'Verified on RouterLab.',
+      note: `Verified on ${serviceLabel}.`,
       strategy,
     };
   }
@@ -177,7 +245,7 @@ function assessStrategy(strategyValue, modelIds = []) {
     return {
       available: true,
       level: 'partial',
-      note: 'Partially available on RouterLab.',
+      note: `Partially available on ${serviceLabel}.`,
       strategy,
     };
   }
@@ -185,20 +253,20 @@ function assessStrategy(strategyValue, modelIds = []) {
   return {
     available: false,
     level: 'unavailable',
-    note: 'Not reported by RouterLab.',
+    note: `Not reported by ${serviceLabel}.`,
     strategy,
   };
 }
 
-function listStrategies(modelIds = []) {
-  return STRATEGIES.map((strategy) => ({
+function listStrategies(modelIds = [], serviceValue = DEFAULT_SERVICE) {
+  return getServiceStrategies(serviceValue).map((strategy) => ({
     ...strategy,
-    availability: assessStrategy(strategy.value, modelIds),
+    availability: assessStrategy(strategy.value, modelIds, serviceValue),
   }));
 }
 
-function getFallbackStrategy(strategyValue, modelIds = []) {
-  const availability = assessStrategy(strategyValue, modelIds);
+function getFallbackStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
+  const availability = assessStrategy(strategyValue, modelIds, serviceValue);
   if (availability.level === 'unavailable') {
     return 'default';
   }
@@ -206,11 +274,11 @@ function getFallbackStrategy(strategyValue, modelIds = []) {
   return strategyValue;
 }
 
-function getStrategyChoices(modelIds = []) {
-  return listStrategies(modelIds).map((strategy) => ({
-    name: `${strategy.selectionName ?? strategy.name}${strategy.availability.level === 'ready' ? '  [Ready]' : strategy.availability.level === 'partial' ? '  [Partial]' : strategy.availability.level === 'unknown' ? '  [Unknown]' : '  [Unavailable]'}`,
+function getStrategyChoices(modelIds = [], serviceValue = DEFAULT_SERVICE) {
+  return listStrategies(modelIds, serviceValue).map((strategy) => ({
+    name: strategy.value,
     value: strategy.value,
-    description: `${strategy.selectionDescription ?? strategy.description} ${strategy.availability.note}`.trim(),
+    description: strategy.selectionDescription ?? strategy.description,
   }));
 }
 
@@ -275,19 +343,25 @@ function runCommand(command, args, options = {}) {
   return result;
 }
 
-function storeToken(token) {
+function storeToken(token, serviceValue = DEFAULT_SERVICE) {
+  const service = getServiceConfig(serviceValue);
+  if (!service) {
+    throw new Error(`Unknown service "${serviceValue}"`);
+  }
+
   const storage = getSecureStorageBackend();
   if (!storage.supported) {
     throw new Error(storage.reason || 'Secure storage is not available on this machine');
   }
 
   if (process.platform === 'win32') {
-    fs.mkdirSync(path.dirname(WINDOWS_TOKEN_FILE), {recursive: true});
+    const tokenFile = getWindowsTokenFile(service.value);
+    fs.mkdirSync(path.dirname(tokenFile), {recursive: true});
     runPowerShell(
       '$secure = ConvertTo-SecureString $env:SCIONOS_TOKEN -AsPlainText -Force; $encrypted = ConvertFrom-SecureString $secure; Set-Content -Path $env:SCIONOS_TOKEN_FILE -Value $encrypted -NoNewline',
       {
         SCIONOS_TOKEN: token,
-        SCIONOS_TOKEN_FILE: WINDOWS_TOKEN_FILE,
+        SCIONOS_TOKEN_FILE: tokenFile,
       },
     );
     return storage;
@@ -298,7 +372,7 @@ function storeToken(token) {
       'add-generic-password',
       '-U',
       '-a',
-      SECURE_STORAGE_ACCOUNT,
+      service.secureStorageAccount,
       '-s',
       SECURE_STORAGE_SERVICE,
       '-w',
@@ -314,11 +388,11 @@ function storeToken(token) {
 
   const result = runCommand('secret-tool', [
     'store',
-    '--label=RouterLab Token',
+    `--label=${service.secureStorageLabel}`,
     'service',
     SECURE_STORAGE_SERVICE,
     'account',
-    SECURE_STORAGE_ACCOUNT,
+    service.secureStorageAccount,
   ], {
     input: token,
   });
@@ -330,21 +404,27 @@ function storeToken(token) {
   return storage;
 }
 
-function getStoredToken() {
+function getStoredToken(serviceValue = DEFAULT_SERVICE) {
+  const service = getServiceConfig(serviceValue);
+  if (!service) {
+    return null;
+  }
+
   const storage = getSecureStorageBackend();
   if (!storage.supported) {
     return null;
   }
 
   if (process.platform === 'win32') {
-    if (!fs.existsSync(WINDOWS_TOKEN_FILE)) {
+    const tokenFile = getWindowsTokenFile(service.value);
+    if (!fs.existsSync(tokenFile)) {
       return null;
     }
 
     const token = runPowerShell(
       '$secure = Get-Content -Path $env:SCIONOS_TOKEN_FILE -Raw | ConvertTo-SecureString; $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }',
       {
-        SCIONOS_TOKEN_FILE: WINDOWS_TOKEN_FILE,
+        SCIONOS_TOKEN_FILE: tokenFile,
       },
     );
     return token || null;
@@ -354,7 +434,7 @@ function getStoredToken() {
     const result = runCommand('security', [
       'find-generic-password',
       '-a',
-      SECURE_STORAGE_ACCOUNT,
+      service.secureStorageAccount,
       '-s',
       SECURE_STORAGE_SERVICE,
       '-w',
@@ -367,23 +447,29 @@ function getStoredToken() {
     'service',
     SECURE_STORAGE_SERVICE,
     'account',
-    SECURE_STORAGE_ACCOUNT,
+    service.secureStorageAccount,
   ]);
   return result.status === 0 ? result.stdout.trim() || null : null;
 }
 
-function deleteStoredToken() {
+function deleteStoredToken(serviceValue = DEFAULT_SERVICE) {
+  const service = getServiceConfig(serviceValue);
+  if (!service) {
+    return false;
+  }
+
   const storage = getSecureStorageBackend();
   if (!storage.supported) {
     return false;
   }
 
   if (process.platform === 'win32') {
-    if (!fs.existsSync(WINDOWS_TOKEN_FILE)) {
+    const tokenFile = getWindowsTokenFile(service.value);
+    if (!fs.existsSync(tokenFile)) {
       return false;
     }
 
-    fs.unlinkSync(WINDOWS_TOKEN_FILE);
+    fs.unlinkSync(tokenFile);
     return true;
   }
 
@@ -391,7 +477,7 @@ function deleteStoredToken() {
     const result = runCommand('security', [
       'delete-generic-password',
       '-a',
-      SECURE_STORAGE_ACCOUNT,
+      service.secureStorageAccount,
       '-s',
       SECURE_STORAGE_SERVICE,
     ]);
@@ -403,14 +489,14 @@ function deleteStoredToken() {
     'service',
     SECURE_STORAGE_SERVICE,
     'account',
-    SECURE_STORAGE_ACCOUNT,
+    service.secureStorageAccount,
   ]);
   return result.status === 0;
 }
 
-function getStoredTokenStatus() {
+function getStoredTokenStatus(serviceValue = DEFAULT_SERVICE) {
   const storage = getSecureStorageBackend();
-  const storedToken = getStoredToken();
+  const storedToken = getStoredToken(serviceValue);
   return {
     ...storage,
     stored: Boolean(storedToken),
@@ -419,9 +505,11 @@ function getStoredTokenStatus() {
 
 export {
   BASE_URL,
+  DEFAULT_SERVICE,
   DEFAULT_ANTHROPIC_VERSION,
   SECURE_STORAGE_ACCOUNT,
   SECURE_STORAGE_SERVICE,
+  SERVICES,
   STRATEGIES,
   TOKEN_HELP_URL,
   assessStrategy,
@@ -430,6 +518,8 @@ export {
   fetchModels,
   getFallbackStrategy,
   getSecureStorageBackend,
+  getServiceConfig,
+  getServiceStrategies,
   getStoredToken,
   getStoredTokenStatus,
   getStrategyChoices,

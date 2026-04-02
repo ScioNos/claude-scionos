@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-import { assessStrategy, getFallbackStrategy } from '../src/routerlab.js';
+import { assessStrategy, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
 import { normalizeEntrypointPath } from '../index.js';
 
@@ -55,6 +55,11 @@ describe('proxy request handling', () => {
 });
 
 describe('strategy metadata', () => {
+  it('resolves known service targets', () => {
+    expect(getServiceConfig().baseUrl).toBe('https://routerlab.ch');
+    expect(getServiceConfig('llm').baseUrl).toBe('https://llm.routerlab.ch');
+  });
+
   it('marks mapped strategies as ready when all target models are available', () => {
     expect(assessStrategy('claude-glm-5', ['claude-glm-5']).level).toBe('ready');
     expect(assessStrategy('aws', [
@@ -64,10 +69,35 @@ describe('strategy metadata', () => {
     ]).level).toBe('ready');
   });
 
+  it('renders service-specific availability notes', () => {
+    expect(assessStrategy('claude-glm-5', ['claude-glm-5'], 'llm').note).toContain('RouterLab LLM');
+  });
+
+  it('uses raw strategy ids in the interactive selector without availability badges', () => {
+    const choices = getStrategyChoices(['claude-glm-5']);
+
+    expect(choices.find((choice) => choice.value === 'claude-glm-5')).toEqual({
+      name: 'claude-glm-5',
+      value: 'claude-glm-5',
+      description: 'Forces all requests to claude-glm-5.',
+    });
+    expect(choices.every((choice) => !choice.name.includes('[Ready]'))).toBe(true);
+  });
+
+  it('shows a service-specific menu for llm', () => {
+    const llmChoices = getStrategyChoices(['claude-glm-5', 'claude-gpt-5.4'], 'llm');
+
+    expect(llmChoices.map((choice) => choice.value)).toEqual([
+      'claude-glm-5',
+      'claude-gpt-5.4',
+    ]);
+  });
+
   it('falls back to default only when a strategy is unavailable', () => {
     expect(getFallbackStrategy('claude-glm-5', ['claude-glm-5'])).toBe('claude-glm-5');
     expect(getFallbackStrategy('claude-glm-5', ['claude-minimax-m2.5'])).toBe('default');
     expect(getFallbackStrategy('aws', null)).toBe('aws');
+    expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt-5.4');
   });
 });
 

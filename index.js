@@ -28,14 +28,15 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { isClaudeCodeInstalled, detectOS, checkGitBashOnWindows, getInstallationInstructions } from './src/detectors/claude-only.js';
 import {
-    BASE_URL,
-    STRATEGIES,
-    TOKEN_HELP_URL,
+    DEFAULT_SERVICE,
+    SERVICES,
     assessStrategy,
     canProceedWithValidation,
     deleteStoredToken,
     getFallbackStrategy,
     getSecureStorageBackend,
+    getServiceConfig,
+    getServiceStrategies,
     getStoredToken,
     getStoredTokenStatus,
     getStrategyChoices,
@@ -87,6 +88,7 @@ function showQuickDocs() {
         ['claude-scionos', 'Guided launch'],
         ['claude-scionos doctor', 'Diagnose setup and RouterLab access'],
         ['claude-scionos auth login', 'Save your token securely'],
+        ['claude-scionos auth login --service llm', 'Save your RouterLab LLM invitation token'],
         ['claude-scionos --list-strategies', 'Show routing options and availability']
     ];
     const commandWidth = Math.max(...commands.map(([command]) => command.length)) + 2;
@@ -99,22 +101,26 @@ function showQuickDocs() {
 }
 
 function showHelp() {
+    const supportedServices = Object.keys(SERVICES).join('|');
     showBanner();
     showQuickDocs();
     console.log(chalk.gray("Flags"));
     console.log(`  ${chalk.cyan("--strategy <value>")}    Preselect a strategy without opening the menu`);
+    console.log(`  ${chalk.cyan(`--service <${supportedServices}>`)}  Select the RouterLab access target (${chalk.white("llm")} is invitation-only)`);
     console.log(`  ${chalk.cyan("--no-prompt")}           Do not ask any interactive question`);
     console.log(`  ${chalk.cyan("--list-strategies")}     List strategies and availability`);
     console.log(`  ${chalk.cyan("--scionos-debug")}       Show proxy and launch diagnostics`);
     console.log("");
     console.log(chalk.gray("Examples"));
     console.log(`  ${chalk.cyan("claude-scionos --strategy aws")}`);
+    console.log(`  ${chalk.cyan("claude-scionos auth login --service llm")}`);
+    console.log(`  ${chalk.cyan("claude-scionos --service llm --strategy claude-glm-5")}`);
     console.log(`  ${chalk.cyan('claude-scionos --strategy aws --no-prompt -p "Summarize this repo"')}`);
     console.log(`  ${chalk.cyan("claude-scionos auth test")}`);
     console.log("");
     console.log(chalk.gray("Token sources"));
     console.log(`  1. ${chalk.white("ANTHROPIC_AUTH_TOKEN")} environment variable`);
-    console.log(`  2. secure local storage via ${chalk.white("claude-scionos auth login")}`);
+    console.log(`  2. secure local storage via ${chalk.white("claude-scionos auth login")} or ${chalk.white("claude-scionos auth login --service llm")}`);
     console.log(`  3. manual prompt in guided mode`);
     console.log("");
 }
@@ -143,6 +149,20 @@ function normalizeStrategyValue(strategy) {
     return strategy?.trim() || null;
 }
 
+function normalizeServiceValue(service) {
+    return service?.trim()?.toLowerCase() || DEFAULT_SERVICE;
+}
+
+function resolveSelectedService(serviceValue) {
+    const service = getServiceConfig(serviceValue);
+    if (service) {
+        return service;
+    }
+
+    const supported = Object.keys(SERVICES).join(', ');
+    throw new Error(`Unknown service "${serviceValue}". Supported values: ${supported}.`);
+}
+
 function parseWrapperArgs(argv) {
     const parsed = {
         authAction: 'status',
@@ -152,6 +172,7 @@ function parseWrapperArgs(argv) {
         help: false,
         listStrategies: false,
         noPrompt: false,
+        service: normalizeServiceValue(process.env.SCIONOS_SERVICE),
         strategy: null,
         version: false
     };
@@ -187,8 +208,19 @@ function parseWrapperArgs(argv) {
             continue;
         }
 
+        if (arg === '--service') {
+            parsed.service = normalizeServiceValue(argv[index + 1]);
+            index += 1;
+            continue;
+        }
+
         if (arg.startsWith('--strategy=')) {
             parsed.strategy = normalizeStrategyValue(arg.slice('--strategy='.length));
+            continue;
+        }
+
+        if (arg.startsWith('--service=')) {
+            parsed.service = normalizeServiceValue(arg.slice('--service='.length));
             continue;
         }
 
@@ -217,14 +249,14 @@ function getEnvironmentToken() {
     return process.env.ANTHROPIC_AUTH_TOKEN?.trim() || null;
 }
 
-function getAvailableTokenCandidate() {
+function getAvailableTokenCandidate(serviceValue) {
     const envToken = getEnvironmentToken();
     if (envToken) {
         return { token: envToken, source: 'environment' };
     }
 
     try {
-        const storedToken = getStoredToken();
+        const storedToken = getStoredToken(serviceValue);
         if (storedToken) {
             return { token: storedToken, source: 'secure-store' };
         }
@@ -249,16 +281,21 @@ function installClaudeCode() {
     });
 }
 
-async function promptAndValidateToken(promptMessage) {
+async function promptAndValidateToken(promptMessage, serviceConfig) {
     while (true) {
-        console.log(chalk.blueBright(`To retrieve your token, visit: ${TOKEN_HELP_URL}`));
+        if (serviceConfig.tokenHelpUrl) {
+            console.log(chalk.blueBright(`To retrieve your token, visit: ${serviceConfig.tokenHelpUrl}`));
+        } else if (serviceConfig.tokenHelpMessage) {
+            console.log(chalk.blueBright(serviceConfig.tokenHelpMessage));
+        }
+
         const token = await password({
             message: promptMessage,
             mask: '*'
         });
 
         console.log(chalk.gray("Validating token..."));
-        const validation = await validateToken(token);
+        const validation = await validateToken(token, { baseUrl: serviceConfig.baseUrl });
         if (canProceedWithValidation(validation)) {
             console.log(chalk.green("✓ Token validated."));
             return { token, validation };
@@ -268,7 +305,7 @@ async function promptAndValidateToken(promptMessage) {
     }
 }
 
-async function maybeStoreToken(token, replaceExisting = false) {
+async function maybeStoreToken(token, serviceConfig, replaceExisting = false) {
     const storage = getSecureStorageBackend();
     if (!storage.supported) {
         return;
@@ -285,15 +322,15 @@ async function maybeStoreToken(token, replaceExisting = false) {
         return;
     }
 
-    storeToken(token);
+    storeToken(token, serviceConfig.value);
     console.log(chalk.green(`✓ Token saved securely in ${storage.backend}.`));
 }
 
-async function resolveLaunchToken(noPrompt) {
-    const candidate = getAvailableTokenCandidate();
+async function resolveLaunchToken(noPrompt, serviceConfig) {
+    const candidate = getAvailableTokenCandidate(serviceConfig.value);
 
     if (candidate.token) {
-        const validation = await validateToken(candidate.token);
+        const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
         if (canProceedWithValidation(validation)) {
             return {
                 token: candidate.token,
@@ -308,8 +345,8 @@ async function resolveLaunchToken(noPrompt) {
         }
 
         console.log(chalk.yellow(`⚠ The ${sourceLabel} token is invalid. Please enter a new token.`));
-        const prompted = await promptAndValidateToken('Please enter your ANTHROPIC_AUTH_TOKEN:');
-        await maybeStoreToken(prompted.token, candidate.source === 'secure-store');
+        const prompted = await promptAndValidateToken(`Please enter your ${serviceConfig.tokenPromptLabel} token:`, serviceConfig);
+        await maybeStoreToken(prompted.token, serviceConfig, candidate.source === 'secure-store');
         return {
             token: prompted.token,
             source: 'manual',
@@ -318,11 +355,11 @@ async function resolveLaunchToken(noPrompt) {
     }
 
     if (noPrompt) {
-        throw new Error('ANTHROPIC_AUTH_TOKEN or a securely stored token is required when using --no-prompt');
+        throw new Error(`ANTHROPIC_AUTH_TOKEN or a securely stored token is required when using --no-prompt for ${serviceConfig.tokenPromptLabel}`);
     }
 
-    const prompted = await promptAndValidateToken('Please enter your ANTHROPIC_AUTH_TOKEN:');
-    await maybeStoreToken(prompted.token);
+    const prompted = await promptAndValidateToken(`Please enter your ${serviceConfig.tokenPromptLabel} token:`, serviceConfig);
+    await maybeStoreToken(prompted.token, serviceConfig);
     return {
         token: prompted.token,
         source: 'manual',
@@ -330,20 +367,20 @@ async function resolveLaunchToken(noPrompt) {
     };
 }
 
-async function resolveStrategyChoice(parsed, modelIds) {
+async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
     if (parsed.strategy) {
-        const strategy = STRATEGIES.find((entry) => entry.value === parsed.strategy);
+        const strategy = getServiceStrategies(serviceConfig.value).find((entry) => entry.value === parsed.strategy);
         if (!strategy) {
             throw new Error(`Unknown strategy "${parsed.strategy}". Use --list-strategies to inspect the supported values.`);
         }
 
-        const fallback = getFallbackStrategy(strategy.value, modelIds);
+        const fallback = getFallbackStrategy(strategy.value, modelIds, serviceConfig.value);
         if (fallback !== strategy.value) {
-            console.log(chalk.yellow(`⚠ Strategy "${strategy.value}" is unavailable on RouterLab. Falling back to "${fallback}".`));
+            console.log(chalk.yellow(`⚠ Strategy "${strategy.value}" is unavailable on ${serviceConfig.availabilityLabel}. Falling back to "${fallback}".`));
         } else {
-            const availability = assessStrategy(strategy.value, modelIds);
+            const availability = assessStrategy(strategy.value, modelIds, serviceConfig.value);
             if (availability.level === 'partial') {
-                console.log(chalk.yellow(`⚠ Strategy "${strategy.value}" is only partially available on RouterLab.`));
+                console.log(chalk.yellow(`⚠ Strategy "${strategy.value}" is only partially available on ${serviceConfig.availabilityLabel}.`));
             }
         }
 
@@ -356,19 +393,19 @@ async function resolveStrategyChoice(parsed, modelIds) {
 
     const selected = await select({
         message: 'Select Model Strategy:',
-        choices: getStrategyChoices(modelIds)
+        choices: getStrategyChoices(modelIds, serviceConfig.value)
     });
 
-    const fallback = getFallbackStrategy(selected, modelIds);
+    const fallback = getFallbackStrategy(selected, modelIds, serviceConfig.value);
     if (fallback !== selected) {
-        console.log(chalk.yellow(`⚠ Strategy "${selected}" is unavailable on RouterLab. Falling back to "${fallback}".`));
+        console.log(chalk.yellow(`⚠ Strategy "${selected}" is unavailable on ${serviceConfig.availabilityLabel}. Falling back to "${fallback}".`));
     }
 
     return fallback;
 }
 
-function showStrategies(modelIds = null) {
-    const strategies = listStrategies(modelIds);
+function showStrategies(modelIds = null, serviceConfig) {
+    const strategies = listStrategies(modelIds, serviceConfig.value);
     showSection('Strategies', strategies.map((strategy) => {
         const badge = strategy.availability.level === 'ready'
             ? chalk.green('Ready')
@@ -381,14 +418,15 @@ function showStrategies(modelIds = null) {
     }));
 }
 
-async function runAuthCommand(action) {
+async function runAuthCommand(action, serviceConfig) {
     showBanner();
     const storage = getSecureStorageBackend();
     const envToken = getEnvironmentToken();
-    const storedStatus = getStoredTokenStatus();
+    const storedStatus = getStoredTokenStatus(serviceConfig.value);
 
     if (action === 'status') {
         showSection('Authentication', [
+            `${chalk.white('Service:')} ${serviceConfig.label}`,
             `${chalk.white('Secure backend:')} ${storage.supported ? storage.backend : `${storage.backend} (${storage.reason})`}`,
             `${chalk.white('Stored token:')} ${storedStatus.stored ? 'available' : 'not stored'}`,
             `${chalk.white('Environment token:')} ${envToken ? 'available' : 'not set'}`
@@ -397,7 +435,7 @@ async function runAuthCommand(action) {
     }
 
     if (action === 'logout') {
-        const removed = deleteStoredToken();
+        const removed = deleteStoredToken(serviceConfig.value);
         console.log(removed ? chalk.green('✓ Stored token removed.') : chalk.yellow('⚠ No stored token was found.'));
         return;
     }
@@ -407,26 +445,26 @@ async function runAuthCommand(action) {
             throw new Error(`Secure storage is unavailable: ${storage.reason || storage.backend}`);
         }
 
-        const prompted = await promptAndValidateToken('Enter the RouterLab token to save securely:');
-        storeToken(prompted.token);
+        const prompted = await promptAndValidateToken(`Enter the ${serviceConfig.tokenPromptLabel} token to save securely:`, serviceConfig);
+        storeToken(prompted.token, serviceConfig.value);
         console.log(chalk.green(`✓ Token saved securely in ${storage.backend}.`));
         return;
     }
 
     if (action === 'test') {
-        const candidate = getAvailableTokenCandidate();
+        const candidate = getAvailableTokenCandidate(serviceConfig.value);
         if (!candidate.token) {
             console.log(chalk.yellow('⚠ No environment token or stored token is available.'));
             return;
         }
 
-        const validation = await validateToken(candidate.token);
+        const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
         console.log(canProceedWithValidation(validation)
             ? chalk.green(`✓ ${formatTokenSource(candidate.source)} token is valid.`)
             : chalk.red(`❌ ${formatTokenSource(candidate.source)} token is invalid: ${validation.message || validation.status || validation.reason}`));
 
         if (canProceedWithValidation(validation)) {
-            showStrategies(validation.models);
+            showStrategies(validation.models, serviceConfig);
         }
         return;
     }
@@ -434,17 +472,18 @@ async function runAuthCommand(action) {
     throw new Error(`Unknown auth action "${action}". Use: login, status, change, logout, test.`);
 }
 
-async function runDoctor() {
+async function runDoctor(serviceConfig) {
     showBanner();
     const osInfo = detectOS();
     const claudeStatus = isClaudeCodeInstalled();
     const storage = getSecureStorageBackend();
-    const storedStatus = getStoredTokenStatus();
+    const storedStatus = getStoredTokenStatus(serviceConfig.value);
     const gitBashStatus = process.platform === 'win32'
         ? checkGitBashOnWindows()
         : { available: true, message: 'Not required on non-Windows systems' };
 
     console.log(chalk.gray('System Diagnostics'));
+    showStatus('Service target', 'ok', serviceConfig.label);
     showStatus('Platform', 'ok', `${osInfo.type} / ${osInfo.shell} / ${osInfo.arch}`);
     showStatus('Node', 'ok', process.version);
     showStatus('Claude Code', claudeStatus.installed ? 'ok' : 'error', claudeStatus.installed ? claudeStatus.cliPath : 'CLI not found');
@@ -456,41 +495,41 @@ async function runDoctor() {
     showStatus('Env token', getEnvironmentToken() ? 'ok' : 'warn', getEnvironmentToken() ? 'available' : 'not set');
     console.log('');
 
-    const candidate = getAvailableTokenCandidate();
+    const candidate = getAvailableTokenCandidate(serviceConfig.value);
     if (!candidate.token) {
-        showStatus('RouterLab auth', 'warn', 'Skipped: no environment or stored token available');
+        showStatus(`${serviceConfig.tokenPromptLabel} auth`, 'warn', 'Skipped: no environment or stored token available');
         console.log('');
         return;
     }
 
-    const validation = await validateToken(candidate.token);
-    showStatus('RouterLab auth', canProceedWithValidation(validation) ? 'ok' : 'error', canProceedWithValidation(validation)
+    const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
+    showStatus(`${serviceConfig.tokenPromptLabel} auth`, canProceedWithValidation(validation) ? 'ok' : 'error', canProceedWithValidation(validation)
         ? `validated via ${formatTokenSource(candidate.source)} token`
         : validation.message || validation.status || validation.reason);
     console.log('');
 
     if (canProceedWithValidation(validation)) {
-        showStrategies(validation.models);
+        showStrategies(validation.models, serviceConfig);
     }
 }
 
-async function runListStrategies() {
+async function runListStrategies(serviceConfig) {
     showBanner();
-    const candidate = getAvailableTokenCandidate();
+    const candidate = getAvailableTokenCandidate(serviceConfig.value);
     if (!candidate.token) {
-        showStrategies(null);
-        console.log(chalk.gray('Tip: save a token with `claude-scionos auth login` to verify availability live.'));
+        showStrategies(null, serviceConfig);
+        console.log(chalk.gray(`Tip: save a token with \`claude-scionos auth login${serviceConfig.value === DEFAULT_SERVICE ? '' : ` --service ${serviceConfig.value}`}\` to verify availability live.`));
         return;
     }
 
-    const validation = await validateToken(candidate.token);
+    const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
     if (canProceedWithValidation(validation)) {
-        showStrategies(validation.models);
+        showStrategies(validation.models, serviceConfig);
         return;
     }
 
     console.log(chalk.yellow(`⚠ Unable to verify strategy availability with the ${formatTokenSource(candidate.source)} token.`));
-    showStrategies(null);
+    showStrategies(null, serviceConfig);
 }
 
 async function ensureClaudeInstallation(osInfo, interactive) {
@@ -544,18 +583,20 @@ async function main() {
         process.exit(0);
     }
 
+    const serviceConfig = resolveSelectedService(parsed.service);
+
     if (parsed.command === 'auth') {
-        await runAuthCommand(parsed.authAction);
+        await runAuthCommand(parsed.authAction, serviceConfig);
         process.exit(0);
     }
 
     if (parsed.command === 'doctor') {
-        await runDoctor();
+        await runDoctor(serviceConfig);
         process.exit(0);
     }
 
     if (parsed.listStrategies) {
-        await runListStrategies();
+        await runListStrategies(serviceConfig);
         process.exit(0);
     }
 
@@ -578,13 +619,13 @@ async function main() {
         }
     }
 
-    const { token, source, validation } = await resolveLaunchToken(parsed.noPrompt);
+    const { token, source, validation } = await resolveLaunchToken(parsed.noPrompt, serviceConfig);
     if (interactive) {
         console.log(chalk.green(`✓ Using ${formatTokenSource(source)} token.`));
     }
 
-    const modelChoice = await resolveStrategyChoice(parsed, validation.models);
-    let finalBaseUrl = BASE_URL;
+    const modelChoice = await resolveStrategyChoice(parsed, validation.models, serviceConfig);
+    let finalBaseUrl = serviceConfig.baseUrl;
     let proxyServer = null;
 
     if (modelChoice !== 'default') {
@@ -593,7 +634,7 @@ async function main() {
         }
 
         const proxyInfo = await startProxyServer(modelChoice, token, {
-            baseUrl: BASE_URL,
+            baseUrl: serviceConfig.baseUrl,
             debug: isDebug,
             onDebug: (message) => console.log(chalk.yellow(message)),
             onError: (message) => console.error(chalk.red(message))
@@ -612,6 +653,7 @@ async function main() {
 
     if (interactive) {
         showSection('Launch Summary', [
+            `${chalk.white('Service:')} ${serviceConfig.label}`,
             `${chalk.white('Token source:')} ${formatTokenSource(source)}`,
             `${chalk.white('Strategy:')} ${modelChoice}`,
             `${chalk.white('Endpoint:')} ${finalBaseUrl}`,
