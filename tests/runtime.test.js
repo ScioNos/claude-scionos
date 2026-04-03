@@ -93,10 +93,17 @@ describe('strategy metadata', () => {
     ]);
   });
 
+  it('keeps claude-gpt-5.4 available on routerlab too', () => {
+    const routerlabChoices = getStrategyChoices(['claude-gpt-5.4'], 'routerlab');
+
+    expect(routerlabChoices.map((choice) => choice.value)).toContain('claude-gpt-5.4');
+  });
+
   it('falls back to default only when a strategy is unavailable', () => {
     expect(getFallbackStrategy('claude-glm-5', ['claude-glm-5'])).toBe('claude-glm-5');
     expect(getFallbackStrategy('claude-glm-5', ['claude-minimax-m2.5'])).toBe('default');
     expect(getFallbackStrategy('aws', null)).toBe('aws');
+    expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt-5.4');
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt-5.4');
   });
 });

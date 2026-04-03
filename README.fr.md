@@ -65,6 +65,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `llm` est prévu pour un accès sur invitation
 - les tokens enregistrés avec `auth login --service llm` sont stockés séparément du token RouterLab par défaut
 - `llm` expose pour l'instant `claude-glm-5` et `claude-gpt-5.4`
+- `routerlab` expose aussi `claude-gpt-5.4`
 
 ## Stratégies
 

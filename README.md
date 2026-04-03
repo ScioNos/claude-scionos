@@ -65,6 +65,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `llm` is intended for invitation-only access
 - Tokens stored with `auth login --service llm` are kept separate from the default RouterLab token
 - `llm` currently exposes `claude-glm-5` and `claude-gpt-5.4`
+- `routerlab` also exposes `claude-gpt-5.4`
 
 ## Strategies
 

@@ -15,7 +15,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-token',
     secureStorageLabel: 'RouterLab Token',
     secureStorageFileName: 'routerlab-token.secure.txt',
-    strategyValues: ['default', 'aws', 'claude-glm-5', 'claude-minimax-m2.5'],
+    strategyValues: ['default', 'aws', 'claude-glm-5', 'claude-minimax-m2.5', 'claude-gpt-5.4'],
   },
   llm: {
     value: 'llm',
