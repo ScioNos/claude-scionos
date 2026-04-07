@@ -41,6 +41,7 @@ import {
     getStoredToken,
     getStoredTokenStatus,
     getStrategyChoices,
+    hasVerifiedModelIds,
     listStrategies,
     storeToken,
     validateToken
@@ -147,7 +148,7 @@ function showStatus(label, level, detail) {
 }
 
 function getStrategyIndicator(strategyValue, modelIds, serviceValue) {
-    if (!Array.isArray(modelIds)) {
+    if (!hasVerifiedModelIds(modelIds)) {
         return chalk.gray('●');
     }
 
@@ -394,7 +395,7 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
             throw new Error(`Strategy "${selected}" cannot support the default Claude Code launch on ${serviceConfig.availabilityLabel}. ${selectedLaunchReadiness.note}`);
         }
 
-        if (Array.isArray(modelIds)) {
+        if (hasVerifiedModelIds(modelIds)) {
             const availability = assessStrategy(selected, modelIds, serviceConfig.value);
             if (availability.level === 'partial') {
                 console.log(chalk.yellow(`⚠ Strategy "${selected}" is only partially available on ${serviceConfig.availabilityLabel}.`));
@@ -419,7 +420,7 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
 
     const strategyChoices = getStrategyChoices(modelIds, serviceConfig.value).map((choice) => {
         const launchReadiness = assessStrategyLaunch(choice.value, modelIds, serviceConfig.value);
-        const disabled = Array.isArray(modelIds) && !launchReadiness.ready ? launchReadiness.note : false;
+        const disabled = hasVerifiedModelIds(modelIds) && !launchReadiness.ready ? launchReadiness.note : false;
 
         return {
             ...choice,
@@ -429,7 +430,7 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
         };
     });
 
-    if (Array.isArray(modelIds) && strategyChoices.every((choice) => choice.disabled)) {
+    if (hasVerifiedModelIds(modelIds) && strategyChoices.every((choice) => choice.disabled)) {
         throw new Error(`No launchable strategy is available on ${serviceConfig.availabilityLabel}.`);
     }
 
@@ -450,7 +451,7 @@ function showStrategies(modelIds = null, serviceConfig) {
     const strategies = listStrategies(modelIds, serviceConfig.value);
     showSection('Strategies', strategies.map((strategy) => {
         const indicator = getStrategyIndicator(strategy.value, modelIds, serviceConfig.value);
-        const state = !Array.isArray(modelIds)
+        const state = !hasVerifiedModelIds(modelIds)
             ? chalk.gray('Unknown')
             : assessStrategyLaunch(strategy.value, modelIds, serviceConfig.value).ready
                 ? chalk.green('Ready')

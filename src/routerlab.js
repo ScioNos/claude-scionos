@@ -211,6 +211,10 @@ function getRequiredModels(strategy) {
   return strategy?.requiredModels ?? strategy?.mappedModels ?? [];
 }
 
+function hasVerifiedModelIds(modelIds) {
+  return Array.isArray(modelIds) && modelIds.length > 0;
+}
+
 function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
   const serviceLabel = getServiceLabel(serviceValue);
   const strategy = findStrategy(strategyValue, serviceValue);
@@ -233,7 +237,7 @@ function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SER
     };
   }
 
-  if (!Array.isArray(modelIds)) {
+  if (!hasVerifiedModelIds(modelIds)) {
     return {
       available: true,
       level: 'unknown',
@@ -293,7 +297,7 @@ function assessStrategyLaunch(strategyValue, modelIds = [], serviceValue = DEFAU
     };
   }
 
-  if (!requiredModels.length || !Array.isArray(modelIds)) {
+  if (!requiredModels.length || !hasVerifiedModelIds(modelIds)) {
     return {
       ready: availability.level !== 'unavailable',
       note: availability.note,
@@ -328,7 +332,7 @@ function assessStrategyLaunch(strategyValue, modelIds = [], serviceValue = DEFAU
 }
 
 function getFallbackStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
-  if (Array.isArray(modelIds)) {
+  if (hasVerifiedModelIds(modelIds)) {
     return assessStrategyLaunch(strategyValue, modelIds, serviceValue).ready ? strategyValue : null;
   }
 
@@ -588,6 +592,7 @@ export {
   getStoredToken,
   getStoredTokenStatus,
   getStrategyChoices,
+  hasVerifiedModelIds,
   listStrategies,
   storeToken,
   validateToken,

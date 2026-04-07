@@ -75,6 +75,12 @@ describe('strategy metadata', () => {
     expect(assessStrategy('claude-glm-5', ['claude-glm-5'], 'llm').note).toContain('RouterLab LLM');
   });
 
+  it('treats an empty verified model list as unknown instead of blocked', () => {
+    expect(assessStrategy('claude-gpt-5.4', []).level).toBe('unknown');
+    expect(assessStrategyLaunch('claude-gpt-5.4', []).ready).toBe(true);
+    expect(getFallbackStrategy('claude-gpt-5.4', [])).toBe('claude-gpt-5.4');
+  });
+
   it('blocks default and aws when one of the required launch models is missing', () => {
     const defaultReadiness = assessStrategyLaunch('default', DEFAULT_CLAUDE_MODELS.slice(0, 2));
     const awsReadiness = assessStrategyLaunch('aws', AWS_CLAUDE_MODELS.slice(0, 2));
