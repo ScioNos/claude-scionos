@@ -21,7 +21,7 @@ const chalk = {
     magenta: (t) => styleText('magenta', t),
     bold: (t) => styleText('bold', t)
 };
-import { password, confirm, select } from '@inquirer/prompts';
+import { password, confirm, select, Separator } from '@inquirer/prompts';
 import { spawn, spawnSync } from 'node:child_process';
 import process from 'node:process';
 import { createRequire } from 'node:module';
@@ -31,6 +31,7 @@ import {
     DEFAULT_SERVICE,
     SERVICES,
     assessStrategy,
+    assessStrategyLaunch,
     canProceedWithValidation,
     deleteStoredToken,
     getFallbackStrategy,
@@ -40,6 +41,7 @@ import {
     getStoredToken,
     getStoredTokenStatus,
     getStrategyChoices,
+    hasVerifiedModelIds,
     listStrategies,
     storeToken,
     validateToken
@@ -146,6 +148,23 @@ function statusBadge(level) {
 function showStatus(label, level, detail) {
     const padded = label.padEnd(20, ' ');
     console.log(`  ${statusBadge(level)}  ${chalk.white(padded)} ${chalk.gray(detail)}`);
+}
+
+function getStrategyIndicator(strategyValue, modelIds, serviceValue) {
+    if (!hasVerifiedModelIds(modelIds)) {
+        return chalk.gray('●');
+    }
+
+    const launchReadiness = assessStrategyLaunch(strategyValue, modelIds, serviceValue);
+    return launchReadiness.ready ? chalk.green('●') : chalk.red('●');
+}
+
+function getStrategyMenuLabel(strategyValue) {
+    if (strategyValue === 'aws') {
+        return '💰 aws 50%';
+    }
+
+    return strategyValue;
 }
 
 function normalizeStrategyValue(strategy) {
@@ -405,53 +424,76 @@ async function resolveLaunchToken(noPrompt, serviceConfig, options = {}) {
 }
 
 async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
+    const finalizeChoice = (selected) => {
+        const selectedLaunchReadiness = assessStrategyLaunch(selected, modelIds, serviceConfig.value);
+        const resolvedStrategy = getFallbackStrategy(selected, modelIds, serviceConfig.value);
+
+        if (!resolvedStrategy) {
+            throw new Error(`Strategy "${selected}" cannot support the default Claude Code launch on ${serviceConfig.availabilityLabel}. ${selectedLaunchReadiness.note}`);
+        }
+
+        if (hasVerifiedModelIds(modelIds)) {
+            const availability = assessStrategy(selected, modelIds, serviceConfig.value);
+            if (availability.level === 'partial') {
+                console.log(chalk.yellow(`⚠ Strategy "${selected}" is only partially available on ${serviceConfig.availabilityLabel}.`));
+            }
+        }
+
+        return resolvedStrategy;
+    };
+
     if (parsed.strategy) {
         const strategy = getServiceStrategies(serviceConfig.value).find((entry) => entry.value === parsed.strategy);
         if (!strategy) {
             throw new Error(`Unknown strategy "${parsed.strategy}". Use --list-strategies to inspect the supported values.`);
         }
 
-        const fallback = getFallbackStrategy(strategy.value, modelIds, serviceConfig.value);
-        if (fallback !== strategy.value) {
-            console.log(chalk.yellow(`⚠ Strategy "${strategy.value}" is unavailable on ${serviceConfig.availabilityLabel}. Falling back to "${fallback}".`));
-        } else {
-            const availability = assessStrategy(strategy.value, modelIds, serviceConfig.value);
-            if (availability.level === 'partial') {
-                console.log(chalk.yellow(`⚠ Strategy "${strategy.value}" is only partially available on ${serviceConfig.availabilityLabel}.`));
-            }
-        }
-
-        return fallback;
+        return finalizeChoice(strategy.value);
     }
 
     if (parsed.noPrompt) {
-        return 'default';
+        return finalizeChoice('default');
     }
+
+    const strategyChoices = getStrategyChoices(modelIds, serviceConfig.value).map((choice) => {
+        const launchReadiness = assessStrategyLaunch(choice.value, modelIds, serviceConfig.value);
+        const disabled = hasVerifiedModelIds(modelIds) && !launchReadiness.ready ? launchReadiness.note : false;
+
+        return {
+            ...choice,
+            disabled,
+            name: `${getStrategyIndicator(choice.value, modelIds, serviceConfig.value)} ${getStrategyMenuLabel(choice.value)}`,
+            short: getStrategyMenuLabel(choice.value)
+        };
+    });
+
+    if (hasVerifiedModelIds(modelIds) && strategyChoices.every((choice) => choice.disabled)) {
+        throw new Error(`No launchable strategy is available on ${serviceConfig.availabilityLabel}.`);
+    }
+
+    const spacedStrategyChoices = strategyChoices.flatMap((choice, index) => (
+        index === strategyChoices.length - 1 ? [choice] : [choice, new Separator(' ')]
+    ));
 
     const selected = await select({
         message: 'Select Model Strategy:',
-        choices: getStrategyChoices(modelIds, serviceConfig.value)
+        choices: spacedStrategyChoices,
+        pageSize: spacedStrategyChoices.length
     });
 
-    const fallback = getFallbackStrategy(selected, modelIds, serviceConfig.value);
-    if (fallback !== selected) {
-        console.log(chalk.yellow(`⚠ Strategy "${selected}" is unavailable on ${serviceConfig.availabilityLabel}. Falling back to "${fallback}".`));
-    }
-
-    return fallback;
+    return finalizeChoice(selected);
 }
 
 function showStrategies(modelIds = null, serviceConfig) {
     const strategies = listStrategies(modelIds, serviceConfig.value);
     showSection('Strategies', strategies.map((strategy) => {
-        const badge = strategy.availability.level === 'ready'
-            ? chalk.green('Ready')
-            : strategy.availability.level === 'partial'
-                ? chalk.yellow('Partial')
-                : strategy.availability.level === 'unknown'
-                    ? chalk.gray('Unknown')
-                    : chalk.red('Unavailable');
-        return `${chalk.white(strategy.name)}  ${badge}  ${chalk.gray(`(${strategy.value})`)}\n    ${strategy.description} ${strategy.availability.note}`.trimEnd();
+        const indicator = getStrategyIndicator(strategy.value, modelIds, serviceConfig.value);
+        const state = !hasVerifiedModelIds(modelIds)
+            ? chalk.gray('Unknown')
+            : assessStrategyLaunch(strategy.value, modelIds, serviceConfig.value).ready
+                ? chalk.green('Ready')
+                : chalk.red('Blocked');
+        return `${indicator} ${chalk.white(strategy.name)}  ${state}  ${chalk.gray(`(${strategy.value})`)}\n    ${strategy.description} ${strategy.availability.note}`.trimEnd();
     }));
 }
 
