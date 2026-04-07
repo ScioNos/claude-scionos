@@ -1,8 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
+import { createAcpServer } from '../src/acp-server.js';
 import { assessStrategy, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
-import { normalizeEntrypointPath } from '../index.js';
+import * as indexModule from '../index.js';
+
+const {
+  isAcpMockEnabled,
+  normalizeEntrypointPath,
+  parseWrapperArgs,
+  resolveLaunchToken,
+} = indexModule;
 
 describe('proxy request handling', () => {
   it('keeps useful upstream headers while stripping hop-by-hop ones', () => {
@@ -115,5 +123,215 @@ describe('entrypoint detection', () => {
     const windowsRelative = relative.split(path.sep).join('\\');
 
     expect(normalizeEntrypointPath(windowsRelative)).toBe(normalizeEntrypointPath(absolute));
+  });
+});
+
+describe('ACP argument parsing', () => {
+  beforeEach(() => {
+    delete process.env.SCIONOS_ACP_MOCK;
+    vi.restoreAllMocks();
+  });
+
+  it('captures --acp as a wrapper-owned flag', () => {
+    const parsed = parseWrapperArgs(['--acp']);
+
+    expect(parsed.acpMode).toBe(true);
+    expect(parsed.claudeArgs).toEqual([]);
+  });
+
+  it('keeps forwarded Claude args while stripping wrapper ACP flags', () => {
+    const parsed = parseWrapperArgs(['--acp', '--strategy', 'aws', '-p', 'hello']);
+
+    expect(parsed.acpMode).toBe(true);
+    expect(parsed.strategy).toBe('aws');
+    expect(parsed.claudeArgs).toEqual(['-p', 'hello']);
+  });
+
+  it('enables ACP mock only with explicit env and ACP mode', () => {
+    const nonAcp = parseWrapperArgs([]);
+    const acp = parseWrapperArgs(['--acp']);
+
+    process.env.SCIONOS_ACP_MOCK = '1';
+
+    expect(isAcpMockEnabled(nonAcp)).toBe(false);
+    expect(isAcpMockEnabled(acp)).toBe(true);
+  });
+
+  it('returns a mock token for ACP no-prompt launches without credentials', async () => {
+    const serviceConfig = getServiceConfig();
+    vi.stubEnv('SCIONOS_ACP_MOCK', '1');
+    vi.spyOn(indexModule, 'validateToken').mockResolvedValue({
+      valid: false,
+      reason: 'bad gateway',
+    });
+
+    const result = await resolveLaunchToken(true, serviceConfig, { acpMock: true });
+
+    expect(result.token).toBe('scionos-acp-mock-token');
+    expect(result.source).toBe('mock-acp');
+    expect(result.validation.reason).toBe('mock_bypass');
+  });
+});
+
+describe('ACP server protocol', () => {
+  it('returns initialize metadata with conservative capabilities', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'initialize',
+        params: {},
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.jsonrpc).toBe('2.0');
+      expect(message.id).toBe(1);
+      expect(message.result.protocolVersion).toBe(1);
+      expect(message.result.capabilities).toEqual({
+        streaming: false,
+        tools: false,
+        prompts: false,
+        resources: false,
+      });
+      expect(message.result.serverInfo.name).toBe('claude-scionos');
+      expect(message.result.sessionId).toMatch(/^session-/);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('rejects message/send before initialize', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          messages: [{ role: 'user', content: 'hello' }],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.error.code).toBe(-32002);
+      expect(message.error.message).toContain('not initialized');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('returns a mock response in ACP mock mode without spawning Claude', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+        mockMode: true,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'initialize',
+        params: {},
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          messages: [{ role: 'user', content: 'hello mock' }],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.id).toBe(2);
+      expect(message.result.content[0].text).toBe('ACP mock response: hello mock');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('returns a response for message/send after initialize', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: process.execPath,
+        claudeArgs: ['-e', "process.stdout.write('bonjour test'); process.exit(0);"],
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'initialize',
+        params: {},
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          messages: [{ role: 'user', content: 'hello' }],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.id).toBe(2);
+      expect(message.result.stopReason).toBe('end_turn');
+      expect(message.result.content[0].text).toBe('bonjour test');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('extracts prompt text from mixed content arrays', () => {
+    const server = createAcpServer({
+      cliPath: 'claude',
+      env: process.env,
+    });
+
+    const prompt = server._test.extractPromptFromParams({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Bonjour' },
+            'le monde',
+          ],
+        },
+      ],
+    });
+
+    expect(prompt).toBe('Bonjour\nle monde');
   });
 });

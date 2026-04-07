@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **ACP Server MVP**: Replaced the provisional stdio bridge with a minimal ACP JSON-RPC server for Zed-compatible `initialize`, `message/send`, `cancel`, and `shutdown` flows.
+
+### Changed
+- **ACP Capabilities**: Advertise conservative ACP capabilities and return empty `tools/list` and `prompts/list` responses until those surfaces are implemented.
+- **ACP Mock Testing**: Allow `SCIONOS_ACP_MOCK=1` to bypass RouterLab token validation only for explicit local ACP wrapper testing.
+- **Documentation**: Clarified the current ACP support level and Zed integration behavior in the English and French READMEs.
+
 ## [4.1.1] - 2026-04-03
 
 ### Added

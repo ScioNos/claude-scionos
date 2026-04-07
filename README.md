@@ -14,6 +14,8 @@ _[🇫🇷 Lire en français](./README.fr.md)_
 - `doctor` to diagnose local setup quickly
 - `auth login|status|change|logout|test` for secure token management
 - Local proxy only when a mapped strategy is selected
+- `--acp` for non-interactive Zed/editor integrations
+- Conservative ACP capabilities (`tools`, `prompts`, `resources`, `streaming` disabled until implemented)
 
 ## Requirements
 
@@ -56,6 +58,7 @@ npx claude-scionos auth test
 npx claude-scionos --strategy aws
 npx claude-scionos --service llm --strategy claude-glm-5
 npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
+npx claude-scionos --acp --no-prompt
 ```
 
 ## Services
@@ -102,13 +105,52 @@ claude-scionos auth logout
 claude-scionos auth test
 ```
 
-## What `--strategy` and `--no-prompt` mean
+## What `--strategy`, `--no-prompt`, and `--acp` mean
 
 - `--strategy <value>` skips the interactive strategy menu and selects the route directly
 - `--service <value>` switches between RouterLab targets. `routerlab` is the default and `llm` is invitation-only
 - `--no-prompt` disables every interactive question
+- `--acp` starts a non-interactive stdio bridge intended for Zed or another ACP-capable editor
 
 When `--no-prompt` is used, the launcher must already have a token from `ANTHROPIC_AUTH_TOKEN` or secure storage.
+
+When `--acp` is used, the wrapper also forces non-interactive behavior and writes its own diagnostics to `stderr` only.
+
+## Zed Integration
+
+Use `claude-scionos --acp` as the custom agent command in Zed. For example:
+
+```json
+{
+  "agent_servers": {
+    "claude-scionos": {
+      "type": "custom",
+      "command": "npx",
+      "args": ["claude-scionos", "--acp", "--no-prompt"]
+    }
+  }
+}
+```
+
+Current ACP support is intentionally minimal:
+- `initialize`
+- `message/send`
+- `tools/list` returns an empty list
+- `prompts/list` returns an empty list
+- `cancel` / `message/cancel`
+- `shutdown`
+
+For local wrapper-only testing without a valid RouterLab token, you can enable the development bypass:
+
+```bash
+SCIONOS_ACP_MOCK=1 node index.js --acp --no-prompt
+```
+
+This mock mode is only intended to let the ACP wrapper start for local/Zed testing. It does not validate real RouterLab access.
+
+The wrapper does not yet advertise streaming, tools, resources, or prompt capabilities.
+
+ACP mode reuses the same service, token, and strategy logic as the normal launcher. If you need a mapped route, pass the same strategy flags you would use in the terminal.
 
 ## Doctor
 

@@ -14,6 +14,8 @@ _[🇬🇧 Read in English](./README.md)_
 - `doctor` pour diagnostiquer rapidement un poste client
 - `auth login|status|change|logout|test` pour gérer le token
 - proxy local lancé uniquement si une stratégie mappée est choisie
+- `--acp` pour les intégrations Zed/éditeur non interactives
+- capabilities ACP conservatrices (`tools`, `prompts`, `resources`, `streaming` désactivés tant qu'ils ne sont pas implémentés)
 
 ## Prérequis
 
@@ -56,6 +58,7 @@ npx claude-scionos auth test
 npx claude-scionos --strategy aws
 npx claude-scionos --service llm --strategy claude-glm-5
 npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
+npx claude-scionos --acp --no-prompt
 ```
 
 ## Services
@@ -102,13 +105,44 @@ claude-scionos auth logout
 claude-scionos auth test
 ```
 
-## Ce que veulent dire `--strategy` et `--no-prompt`
+## Ce que veulent dire `--strategy`, `--no-prompt` et `--acp`
 
 - `--strategy <value>` évite le menu interactif et choisit directement la route
 - `--service <value>` change la cible RouterLab. `routerlab` reste le défaut et `llm` est réservé à l'accès sur invitation
 - `--no-prompt` désactive toutes les questions interactives
+- `--acp` démarre un pont stdio non interactif destiné à Zed ou à un autre éditeur compatible ACP
 
 Quand `--no-prompt` est utilisé, le lanceur doit déjà avoir un token via `ANTHROPIC_AUTH_TOKEN` ou via le stockage sécurisé.
+
+Quand `--acp` est utilisé, le wrapper force aussi un comportement non interactif et écrit ses diagnostics uniquement sur `stderr`.
+
+## Intégration Zed
+
+Utilise `claude-scionos --acp` comme commande d'agent personnalisé dans Zed. Exemple :
+
+```json
+{
+  "agent_servers": {
+    "claude-scionos": {
+      "type": "custom",
+      "command": "npx",
+      "args": ["claude-scionos", "--acp", "--no-prompt"]
+    }
+  }
+}
+```
+
+Le support ACP actuel est volontairement minimal :
+- `initialize`
+- `message/send`
+- `tools/list` renvoie une liste vide
+- `prompts/list` renvoie une liste vide
+- `cancel` / `message/cancel`
+- `shutdown`
+
+Le wrapper n'annonce pas encore de support pour le streaming, les tools, les resources ou les prompts.
+
+Le mode ACP réutilise la même logique de service, token et stratégie que le lanceur normal. Si tu veux une route mappée, passe les mêmes flags de stratégie qu'en terminal.
 
 ## Doctor
 
