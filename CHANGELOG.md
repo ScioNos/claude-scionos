@@ -226,11 +226,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic credential cleanup on exit
 - Environment variable isolation
 
+[4.1.2]: https://github.com/ScioNos/claude-scionos/compare/v4.1.1...v4.1.2
+[4.1.1]: https://github.com/ScioNos/claude-scionos/compare/v4.1.0...v4.1.1
+[4.1.0]: https://github.com/ScioNos/claude-scionos/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/ScioNos/claude-scionos/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/ScioNos/claude-scionos/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/ScioNos/claude-scionos/compare/v3.0.7...v3.1.0
-[3.0.6]: https://github.com/ScioNos/claude-scionos/compare/v3.0.5...v3.0.6
 [3.0.7]: https://github.com/ScioNos/claude-scionos/compare/v3.0.6...v3.0.7
+[3.0.6]: https://github.com/ScioNos/claude-scionos/compare/v3.0.5...v3.0.6
 [3.0.5]: https://github.com/ScioNos/claude-scionos/compare/v3.0.4...v3.0.5
 [3.0.4]: https://github.com/ScioNos/claude-scionos/compare/v3.0.3...v3.0.4
 [3.0.3]: https://github.com/ScioNos/claude-scionos/compare/v3.0.2...v3.0.3
