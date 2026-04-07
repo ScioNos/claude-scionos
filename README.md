@@ -132,8 +132,10 @@ Use `claude-scionos --acp` as the custom agent command in Zed. For example:
 }
 ```
 
-Current ACP support is intentionally minimal:
+Current ACP support is intentionally minimal but now includes the Zed session flow:
 - `initialize`
+- `session/new`
+- `session/get`
 - `message/send`
 - `tools/list` returns an empty list
 - `prompts/list` returns an empty list

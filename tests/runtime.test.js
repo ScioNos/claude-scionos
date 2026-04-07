@@ -174,6 +174,33 @@ describe('ACP argument parsing', () => {
 });
 
 describe('ACP server protocol', () => {
+  it('writes a claude-scionos-acp startup banner to the log file when started', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const logFilePath = path.join(os.tmpdir(), `claude-scionos-acp-${Date.now()}.log`);
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+        logFilePath,
+      });
+
+      const startPromise = server.start();
+      process.stdin.emit('end');
+      await startPromise;
+
+      const logContent = fs.readFileSync(logFilePath, 'utf8');
+      expect(logContent).toContain('[claude-scionos-acp] start');
+      expect(logContent).toContain('cliPath=claude');
+    } finally {
+      if (fs.existsSync(logFilePath)) {
+        fs.unlinkSync(logFilePath);
+      }
+    }
+  });
+
   it('returns initialize metadata with conservative capabilities', async () => {
     const outputs = [];
     const originalWrite = process.stdout.write;
@@ -201,11 +228,53 @@ describe('ACP server protocol', () => {
       expect(message.result.capabilities).toEqual({
         streaming: false,
         tools: false,
-        prompts: false,
+        prompts: true,
         resources: false,
       });
       expect(message.result.serverInfo.name).toBe('claude-scionos');
       expect(message.result.sessionId).toMatch(/^session-/);
+      expect(message.result.session_id).toBe(message.result.sessionId);
+      expect(message.result.id).toBe(message.result.sessionId);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('creates a session with session/new and keeps the same id in session/get', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'session/new',
+        params: {},
+      });
+
+      const created = JSON.parse(outputs.at(-1));
+      expect(created.result.sessionId).toMatch(/^session-/);
+
+      await server._test.handleRequest({
+        id: 2,
+        method: 'session/get',
+        params: {
+          session_id: created.result.session_id,
+        },
+      });
+
+      const fetched = JSON.parse(outputs.at(-1));
+      expect(fetched.result.sessionId).toBe(created.result.sessionId);
+      expect(fetched.result.session_id).toBe(created.result.session_id);
+      expect(fetched.result.id).toBe(created.result.id);
     } finally {
       process.stdout.write = originalWrite;
     }
@@ -314,24 +383,108 @@ describe('ACP server protocol', () => {
     }
   });
 
-  it('extracts prompt text from mixed content arrays', () => {
+  it('returns a response for message/send after session/new with ACP-style input', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: process.execPath,
+        claudeArgs: ['-e', "process.stdout.write('bonjour input'); process.exit(0);"],
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'session/new',
+        params: {
+          session_id: 'session-zed-test',
+        },
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          session_id: 'session-zed-test',
+          input: [
+            {
+              role: 'user',
+              parts: [
+                { type: 'text', text: 'bonjour' },
+              ],
+            },
+          ],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.id).toBe(2);
+      expect(message.result.sessionId).toBe('session-zed-test');
+      expect(message.result.content[0].text).toBe('bonjour input');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('extracts prompt text from ACP input parts', () => {
     const server = createAcpServer({
       cliPath: 'claude',
       env: process.env,
     });
 
     const prompt = server._test.extractPromptFromParams({
-      messages: [
+      input: [
         {
           role: 'user',
-          content: [
-            { type: 'text', text: 'Bonjour' },
-            'le monde',
+          parts: [
+            { type: 'text', text: 'Salut' },
+            { type: 'text', text: 'Zed' },
           ],
         },
       ],
     });
 
-    expect(prompt).toBe('Bonjour\nle monde');
+    expect(prompt).toBe('Salut\nZed');
+  });
+
+  it('returns an error when session/get requests an unknown session', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'session/new',
+        params: {
+          session_id: 'session-known',
+        },
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'session/get',
+        params: {
+          session_id: 'session-other',
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.error.code).toBe(-32004);
+      expect(message.error.message).toContain('Unknown session');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
   });
 });

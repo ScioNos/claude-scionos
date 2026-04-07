@@ -132,8 +132,10 @@ Utilise `claude-scionos --acp` comme commande d'agent personnalisé dans Zed. Ex
 }
 ```
 
-Le support ACP actuel est volontairement minimal :
+Le support ACP actuel reste volontairement minimal, mais inclut désormais le flux de session attendu par Zed :
 - `initialize`
+- `session/new`
+- `session/get`
 - `message/send`
 - `tools/list` renvoie une liste vide
 - `prompts/list` renvoie une liste vide

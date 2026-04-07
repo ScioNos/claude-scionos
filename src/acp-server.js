@@ -34,6 +34,19 @@ function createAcpServer(options) {
     logFilePath = null,
   } = options;
 
+  const protocolVersion = 1;
+  const serverInfo = {
+    name: 'claude-scionos',
+    version: '4.1.1',
+    description: 'ACP server wrapper for Claude Code with ScioNos routing',
+  };
+  const capabilities = {
+    streaming: false,
+    tools: false,
+    prompts: true,
+    resources: false,
+  };
+
   let buffer = '';
   let sessionId = null;
   let initialized = false;
@@ -55,9 +68,18 @@ function createAcpServer(options) {
     }
   }
 
+  function logBanner() {
+    logEvent(`[claude-scionos-acp] start pid=${process.pid} cwd=${process.cwd()} cliPath=${cliPath} mockMode=${mockMode ? '1' : '0'} logFile=${logFilePath ?? 'none'}`);
+  }
+
   function writeMessage(payload) {
-    logEvent(`[ACP OUT] ${JSON.stringify(payload)}`);
-    process.stdout.write(`${JSON.stringify(payload)}\n`);
+    const message = JSON.stringify(payload);
+    logEvent(`[ACP OUT] ${message}`);
+    process.stdout.write(`${message}\n`);
+    // Ensure the message is flushed immediately for stdio communication
+    if (process.stdout.flush) {
+      process.stdout.flush();
+    }
   }
 
   function sendResponse(id, result) {
@@ -118,7 +140,17 @@ function createAcpServer(options) {
   function extractPromptFromParams(params = {}) {
     if (Array.isArray(params.messages) && params.messages.length > 0) {
       const lastMessage = params.messages[params.messages.length - 1];
-      return normalizeMessageContent(lastMessage?.content);
+      return normalizeMessageContent(lastMessage?.content ?? lastMessage?.parts);
+    }
+
+    if (Array.isArray(params.input) && params.input.length > 0) {
+      const lastInput = params.input[params.input.length - 1];
+      return normalizeMessageContent(lastInput?.content ?? lastInput?.parts);
+    }
+
+    // Handle prompt as array (e.g., [{"type":"text","text":"coucou"}])
+    if (Array.isArray(params.prompt) && params.prompt.length > 0) {
+      return normalizeMessageContent(params.prompt);
     }
 
     if (typeof params.prompt === 'string') {
@@ -134,6 +166,22 @@ function createAcpServer(options) {
     }
 
     return '';
+  }
+
+  function ensureSessionId(requestedSessionId = null) {
+    sessionId = requestedSessionId || sessionId || generateSessionId();
+    return sessionId;
+  }
+
+  function buildSessionPayload(currentSessionId) {
+    return {
+      sessionId: currentSessionId,
+      session_id: currentSessionId,
+      id: currentSessionId,
+      protocolVersion,
+      capabilities,
+      serverInfo,
+    };
   }
 
   function spawnClaude(prompt) {
@@ -191,24 +239,31 @@ function createAcpServer(options) {
   }
 
   async function handleInitialize(id, params = {}) {
-    sessionId = params.sessionId || generateSessionId();
+    sessionId = ensureSessionId(params.sessionId ?? params.session_id ?? params.id);
     initialized = true;
-    sendResponse(id, {
-      protocolVersion: 1,
-      capabilities: {
-        streaming: false,
-        tools: false,
-        prompts: false,
-        resources: false,
-      },
-      serverInfo: {
-        name: 'claude-scionos',
-        version: '4.1.1',
-        description: 'ACP server wrapper for Claude Code with ScioNos routing',
-      },
-      sessionId,
-    });
+    sendResponse(id, buildSessionPayload(sessionId));
     logEvent(`[ACP] initialize -> session ${sessionId}`);
+  }
+
+  function handleSessionNew(id, params = {}) {
+    const nextSessionId = ensureSessionId(params.sessionId ?? params.session_id ?? params.id);
+    initialized = true;
+    sendResponse(id, buildSessionPayload(nextSessionId));
+    logEvent(`[ACP] session/new -> session ${nextSessionId}`);
+  }
+
+  function handleSessionGet(id, params = {}) {
+    const requestedSessionId = params.sessionId ?? params.session_id ?? params.id;
+
+    if (requestedSessionId && sessionId && requestedSessionId !== sessionId) {
+      sendError(id, -32004, `Unknown session: ${requestedSessionId}`);
+      return;
+    }
+
+    const currentSessionId = ensureSessionId(requestedSessionId);
+    initialized = true;
+    sendResponse(id, buildSessionPayload(currentSessionId));
+    logEvent(`[ACP] session/get -> session ${currentSessionId}`);
   }
 
   function handlePromptsList(id) {
@@ -226,7 +281,6 @@ function createAcpServer(options) {
     }
 
     const prompt = extractPromptFromParams(params).trim();
-    logEvent(`[ACP IN] message/send prompt=${JSON.stringify(prompt)}`);
     if (!prompt) {
       sendError(id, -32602, 'No prompt content provided');
       return;
@@ -282,7 +336,12 @@ function createAcpServer(options) {
   async function handleRequest(request) {
     activeRequests += 1;
     try {
-      const { id = null, method, params = {} } = request ?? {};
+      let { id = null, method, params = {} } = request ?? {};
+
+      // Normalize method path: remove leading slash
+      if (typeof method === 'string' && method.startsWith('/')) {
+        method = method.slice(1);
+      }
 
       if (!method || typeof method !== 'string') {
         if (id !== null) {
@@ -295,6 +354,13 @@ function createAcpServer(options) {
         case 'initialize':
           await handleInitialize(id, params);
           break;
+        case 'session/new':
+          handleSessionNew(id, params);
+          break;
+        case 'session/get':
+        case 'session/current':
+          handleSessionGet(id, params);
+          break;
         case 'prompts/list':
           handlePromptsList(id);
           break;
@@ -303,6 +369,7 @@ function createAcpServer(options) {
           break;
         case 'message/send':
         case 'prompt':
+        case 'session/prompt':
           await handleMessageSend(id, params);
           break;
         case 'cancel':
@@ -313,6 +380,7 @@ function createAcpServer(options) {
           handleShutdown(id);
           break;
         default:
+          logEvent(`[ACP IN] unknown method: ${method}`);
           if (id !== null) {
             sendError(id, -32601, `Method not supported: ${method}`);
           }
@@ -355,6 +423,7 @@ function createAcpServer(options) {
   }
 
   async function start() {
+    logBanner();
     logDebug('[ACP] Server started on stdio');
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', (chunk) => {
