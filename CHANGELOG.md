@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.2] - 2026-04-07
+
+### Changed
+- **Strategy Validation**: Added launch-readiness checks for every strategy, including full 3-model validation for `default` and `aws`.
+- **Billing Safety**: Removed silent fallback between groups so an unavailable strategy now fails explicitly instead of switching billing paths.
+- **Strategy Menu**: Added launch status indicators, blocked unavailable groups, reordered `routerlab` strategies, improved spacing, and expanded the menu to show all entries at once.
+
 ## [4.1.1] - 2026-04-03
 
 ### Added

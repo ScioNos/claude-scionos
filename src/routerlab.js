@@ -15,7 +15,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-token',
     secureStorageLabel: 'RouterLab Token',
     secureStorageFileName: 'routerlab-token.secure.txt',
-    strategyValues: ['default', 'aws', 'claude-glm-5', 'claude-minimax-m2.5', 'claude-gpt-5.4'],
+    strategyValues: ['default', 'aws', 'claude-gpt-5.4', 'claude-glm-5', 'claude-minimax-m2.5'],
   },
   llm: {
     value: 'llm',
@@ -37,6 +37,16 @@ const TOKEN_HELP_URL = SERVICES[DEFAULT_SERVICE].tokenHelpUrl;
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
 const SECURE_STORAGE_SERVICE = 'claude-scionos';
 const SECURE_STORAGE_ACCOUNT = SERVICES[DEFAULT_SERVICE].secureStorageAccount;
+const DEFAULT_CLAUDE_MODELS = [
+  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-6',
+  'claude-opus-4-6',
+];
+const AWS_CLAUDE_MODELS = [
+  'aws-claude-haiku-4-5-20251001',
+  'aws-claude-sonnet-4-6',
+  'aws-claude-opus-4-6',
+];
 
 const STRATEGIES = [
   {
@@ -45,6 +55,7 @@ const STRATEGIES = [
     description: 'Uses Claude natively without a local proxy.',
     selectionName: 'Default (Use Claude natively)',
     selectionDescription: 'Standard behavior. Claude decides which model to use.',
+    requiredModels: DEFAULT_CLAUDE_MODELS,
   },
   {
     value: 'aws',
@@ -52,11 +63,8 @@ const STRATEGIES = [
     description: 'Maps Claude requests to AWS-backed Claude variants.',
     selectionName: 'Claude AWS (-50% du prix 💰)',
     selectionDescription: 'Map models to aws-claude-haiku, aws-claude-sonnet, aws-claude-opus.',
-    mappedModels: [
-      'aws-claude-haiku-4-5-20251001',
-      'aws-claude-sonnet-4-6',
-      'aws-claude-opus-4-6',
-    ],
+    requiredModels: AWS_CLAUDE_MODELS,
+    mappedModels: AWS_CLAUDE_MODELS,
   },
   {
     value: 'claude-glm-5',
@@ -199,6 +207,10 @@ function findStrategy(strategyValue, serviceValue = DEFAULT_SERVICE) {
   return getServiceStrategies(serviceValue).find((strategy) => strategy.value === strategyValue) ?? null;
 }
 
+function getRequiredModels(strategy) {
+  return strategy?.requiredModels ?? strategy?.mappedModels ?? [];
+}
+
 function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
   const serviceLabel = getServiceLabel(serviceValue);
   const strategy = findStrategy(strategyValue, serviceValue);
@@ -211,7 +223,8 @@ function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SER
     };
   }
 
-  if (strategy.value === 'default') {
+  const requiredModels = getRequiredModels(strategy);
+  if (!requiredModels.length) {
     return {
       available: true,
       level: 'ready',
@@ -230,9 +243,9 @@ function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SER
   }
 
   const availableModels = new Set(modelIds);
-  const presentCount = strategy.mappedModels.filter((model) => availableModels.has(model)).length;
+  const presentCount = requiredModels.filter((model) => availableModels.has(model)).length;
 
-  if (presentCount === strategy.mappedModels.length) {
+  if (presentCount === requiredModels.length) {
     return {
       available: true,
       level: 'ready',
@@ -265,13 +278,62 @@ function listStrategies(modelIds = [], serviceValue = DEFAULT_SERVICE) {
   }));
 }
 
-function getFallbackStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
+function assessStrategyLaunch(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
   const availability = assessStrategy(strategyValue, modelIds, serviceValue);
-  if (availability.level === 'unavailable') {
-    return 'default';
+  const serviceLabel = getServiceLabel(serviceValue);
+  const requiredModels = getRequiredModels(availability.strategy);
+
+  if (!availability.strategy) {
+    return {
+      ready: false,
+      note: 'Unknown strategy.',
+      missingModels: [],
+      requiredModels: [],
+      availability,
+    };
   }
 
-  return strategyValue;
+  if (!requiredModels.length || !Array.isArray(modelIds)) {
+    return {
+      ready: availability.level !== 'unavailable',
+      note: availability.note,
+      missingModels: [],
+      requiredModels,
+      availability,
+    };
+  }
+
+  const missingModels = requiredModels.filter((model) => !modelIds.includes(model));
+  if (missingModels.length === 0) {
+    return {
+      ready: true,
+      note: `Default Claude Code launch verified on ${serviceLabel}.`,
+      missingModels,
+      requiredModels,
+      availability,
+    };
+  }
+
+  const note = requiredModels.length === 1
+    ? `Default Claude Code launch requires ${requiredModels[0]}, which is not reported by ${serviceLabel}.`
+    : `Default Claude Code launch requires all of: ${requiredModels.join(', ')}. Missing on ${serviceLabel}: ${missingModels.join(', ')}.`;
+
+  return {
+    ready: false,
+    note,
+    missingModels,
+    requiredModels,
+    availability,
+  };
+}
+
+function getFallbackStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
+  if (Array.isArray(modelIds)) {
+    return assessStrategyLaunch(strategyValue, modelIds, serviceValue).ready ? strategyValue : null;
+  }
+
+  const availability = assessStrategy(strategyValue, modelIds, serviceValue);
+  return availability.level === 'unavailable' ? null : strategyValue;
 }
 
 function getStrategyChoices(modelIds = [], serviceValue = DEFAULT_SERVICE) {
@@ -505,14 +567,17 @@ function getStoredTokenStatus(serviceValue = DEFAULT_SERVICE) {
 
 export {
   BASE_URL,
+  DEFAULT_CLAUDE_MODELS,
   DEFAULT_SERVICE,
   DEFAULT_ANTHROPIC_VERSION,
+  AWS_CLAUDE_MODELS,
   SECURE_STORAGE_ACCOUNT,
   SECURE_STORAGE_SERVICE,
   SERVICES,
   STRATEGIES,
   TOKEN_HELP_URL,
   assessStrategy,
+  assessStrategyLaunch,
   canProceedWithValidation,
   deleteStoredToken,
   fetchModels,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-import { assessStrategy, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
+import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
 import { normalizeEntrypointPath } from '../index.js';
 
@@ -60,17 +60,29 @@ describe('strategy metadata', () => {
     expect(getServiceConfig('llm').baseUrl).toBe('https://llm.routerlab.ch');
   });
 
-  it('marks mapped strategies as ready when all target models are available', () => {
+  it('marks default and mapped strategies as ready only when all required models are available', () => {
+    expect(assessStrategy('default', DEFAULT_CLAUDE_MODELS).level).toBe('ready');
     expect(assessStrategy('claude-glm-5', ['claude-glm-5']).level).toBe('ready');
-    expect(assessStrategy('aws', [
-      'aws-claude-haiku-4-5-20251001',
-      'aws-claude-sonnet-4-6',
-      'aws-claude-opus-4-6',
-    ]).level).toBe('ready');
+    expect(assessStrategy('aws', AWS_CLAUDE_MODELS).level).toBe('ready');
+  });
+
+  it('marks grouped strategies as partial when one of the required models is missing', () => {
+    expect(assessStrategy('default', DEFAULT_CLAUDE_MODELS.slice(0, 2)).level).toBe('partial');
+    expect(assessStrategy('aws', AWS_CLAUDE_MODELS.slice(0, 2)).level).toBe('partial');
   });
 
   it('renders service-specific availability notes', () => {
     expect(assessStrategy('claude-glm-5', ['claude-glm-5'], 'llm').note).toContain('RouterLab LLM');
+  });
+
+  it('blocks default and aws when one of the required launch models is missing', () => {
+    const defaultReadiness = assessStrategyLaunch('default', DEFAULT_CLAUDE_MODELS.slice(0, 2));
+    const awsReadiness = assessStrategyLaunch('aws', AWS_CLAUDE_MODELS.slice(0, 2));
+
+    expect(defaultReadiness.ready).toBe(false);
+    expect(defaultReadiness.missingModels).toEqual(['claude-opus-4-6']);
+    expect(awsReadiness.ready).toBe(false);
+    expect(awsReadiness.missingModels).toEqual(['aws-claude-opus-4-6']);
   });
 
   it('uses raw strategy ids in the interactive selector without availability badges', () => {
@@ -93,6 +105,18 @@ describe('strategy metadata', () => {
     ]);
   });
 
+  it('keeps claude-gpt-5.4 as the third routerlab option', () => {
+    const routerlabChoices = getStrategyChoices(['claude-gpt-5.4'], 'routerlab');
+
+    expect(routerlabChoices.map((choice) => choice.value)).toEqual([
+      'default',
+      'aws',
+      'claude-gpt-5.4',
+      'claude-glm-5',
+      'claude-minimax-m2.5',
+    ]);
+  });
+
   it('keeps claude-gpt-5.4 available on routerlab too', () => {
     const routerlabChoices = getStrategyChoices(['claude-gpt-5.4'], 'routerlab');
 
@@ -101,7 +125,12 @@ describe('strategy metadata', () => {
 
   it('falls back to default only when a strategy is unavailable', () => {
     expect(getFallbackStrategy('claude-glm-5', ['claude-glm-5'])).toBe('claude-glm-5');
-    expect(getFallbackStrategy('claude-glm-5', ['claude-minimax-m2.5'])).toBe('default');
+    expect(getFallbackStrategy('claude-glm-5', ['claude-minimax-m2.5'])).toBe(null);
+    expect(getFallbackStrategy('default', DEFAULT_CLAUDE_MODELS.slice(0, 1))).toBe(null);
+    expect(getFallbackStrategy('aws', AWS_CLAUDE_MODELS.slice(0, 2))).toBe(null);
+    expect(getFallbackStrategy('aws', ['aws-claude-sonnet-4-6'])).toBe(null);
+    expect(getFallbackStrategy('aws', DEFAULT_CLAUDE_MODELS)).toBe(null);
+    expect(getFallbackStrategy('aws', AWS_CLAUDE_MODELS)).toBe('aws');
     expect(getFallbackStrategy('aws', null)).toBe('aws');
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt-5.4');
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt-5.4');
