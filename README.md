@@ -64,7 +64,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `--service llm` switches the launcher to `https://llm.routerlab.ch`
 - `llm` is intended for invitation-only access
 - Tokens stored with `auth login --service llm` are kept separate from the default RouterLab token
-- `llm` currently exposes `claude-glm-5` and `claude-gpt-5.4`
+- `llm` currently exposes `claude-glm-5`, `claude-gpt-5.4`, and `claude-qwen3.6-plus`
 - `routerlab` also exposes `claude-gpt-5.4`
 
 ## Strategies
@@ -74,6 +74,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `claude-glm-5`: force all requests to `claude-glm-5`
 - `claude-minimax-m2.5`: force all requests to `claude-minimax-m2.5`
 - `claude-gpt-5.4`: force all requests to `claude-gpt-5.4`
+- `claude-qwen3.6-plus`: force all requests to `claude-qwen3.6-plus`
 
 Use `--list-strategies` to see the strategies available for the selected service and their live availability when a token is available.
 

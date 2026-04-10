@@ -103,11 +103,12 @@ describe('strategy metadata', () => {
   });
 
   it('shows a service-specific menu for llm', () => {
-    const llmChoices = getStrategyChoices(['claude-glm-5', 'claude-gpt-5.4'], 'llm');
+    const llmChoices = getStrategyChoices(['claude-glm-5', 'claude-gpt-5.4', 'claude-qwen3.6-plus'], 'llm');
 
     expect(llmChoices.map((choice) => choice.value)).toEqual([
       'claude-glm-5',
       'claude-gpt-5.4',
+      'claude-qwen3.6-plus',
     ]);
   });
 
@@ -140,6 +141,7 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('aws', null)).toBe('aws');
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt-5.4');
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt-5.4');
+    expect(getFallbackStrategy('claude-qwen3.6-plus', ['claude-qwen3.6-plus'], 'llm')).toBe('claude-qwen3.6-plus');
   });
 });
 
