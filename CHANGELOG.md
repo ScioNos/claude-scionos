@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.5] - 2026-04-12
+
+### Fixed
+- **Windows Secure Token Handling**: Treat empty secure token files as missing/corrupted and fail fast when secure token writes produce no encrypted content.
+
 ## [4.1.4] - 2026-04-10
 
 ### Added

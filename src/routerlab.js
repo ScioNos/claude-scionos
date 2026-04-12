@@ -199,6 +199,14 @@ function getWindowsTokenFile(serviceValue = DEFAULT_SERVICE) {
   return path.join(os.homedir(), '.claude-scionos', service.secureStorageFileName);
 }
 
+function hasNonEmptyWindowsTokenFile(tokenFile) {
+  try {
+    return fs.statSync(tokenFile).size > 0;
+  } catch {
+    return false;
+  }
+}
+
 function getServiceStrategies(serviceValue = DEFAULT_SERVICE) {
   const service = getServiceConfig(serviceValue);
   if (!service?.strategyValues?.length) {
@@ -437,6 +445,11 @@ function storeToken(token, serviceValue = DEFAULT_SERVICE) {
         SCIONOS_TOKEN_FILE: tokenFile,
       },
     );
+
+    if (!hasNonEmptyWindowsTokenFile(tokenFile)) {
+      throw new Error('Secure token file was created but no encrypted content was written');
+    }
+
     return storage;
   }
 
@@ -491,6 +504,10 @@ function getStoredToken(serviceValue = DEFAULT_SERVICE) {
   if (process.platform === 'win32') {
     const tokenFile = getWindowsTokenFile(service.value);
     if (!fs.existsSync(tokenFile)) {
+      return null;
+    }
+
+    if (!hasNonEmptyWindowsTokenFile(tokenFile)) {
       return null;
     }
 
