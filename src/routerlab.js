@@ -28,7 +28,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-llm-token',
     secureStorageLabel: 'RouterLab LLM Token',
     secureStorageFileName: 'routerlab-llm-token.secure.txt',
-    strategyValues: ['claude-glm-5', 'claude-gpt-5.4'],
+    strategyValues: ['claude-glm-5', 'claude-gpt-5.4', 'claude-qwen3.6-plus'],
   },
 };
 const DEFAULT_SERVICE = 'routerlab';
@@ -86,6 +86,13 @@ const STRATEGIES = [
     description: 'Forces all requests to claude-gpt-5.4.',
     selectionDescription: 'Forces all requests to claude-gpt-5.4.',
     mappedModels: ['claude-gpt-5.4'],
+  },
+  {
+    value: 'claude-qwen3.6-plus',
+    name: 'Qwen3.6 Plus',
+    description: 'Forces all requests to claude-qwen3.6-plus.',
+    selectionDescription: 'Forces all requests to claude-qwen3.6-plus.',
+    mappedModels: ['claude-qwen3.6-plus'],
   },
 ];
 

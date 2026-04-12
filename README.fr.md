@@ -67,7 +67,7 @@ npx claude-scionos --acp --no-prompt
 - `--service llm` bascule le lanceur vers `https://llm.routerlab.ch`
 - `llm` est prévu pour un accès sur invitation
 - les tokens enregistrés avec `auth login --service llm` sont stockés séparément du token RouterLab par défaut
-- `llm` expose pour l'instant `claude-glm-5` et `claude-gpt-5.4`
+- `llm` expose pour l'instant `claude-glm-5`, `claude-gpt-5.4` et `claude-qwen3.6-plus`
 - `routerlab` expose aussi `claude-gpt-5.4`
 
 ## Stratégies
@@ -77,6 +77,7 @@ npx claude-scionos --acp --no-prompt
 - `claude-glm-5` : force toutes les requêtes vers `claude-glm-5`
 - `claude-minimax-m2.5` : force toutes les requêtes vers `claude-minimax-m2.5`
 - `claude-gpt-5.4` : force toutes les requêtes vers `claude-gpt-5.4`
+- `claude-qwen3.6-plus` : force toutes les requêtes vers `claude-qwen3.6-plus`
 
 Utilise `--list-strategies` pour voir les stratégies disponibles pour le service choisi et leur disponibilité réelle quand un token est disponible.
 
