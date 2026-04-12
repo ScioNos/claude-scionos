@@ -207,6 +207,10 @@ function hasNonEmptyWindowsTokenFile(tokenFile) {
   }
 }
 
+function encodeTokenForPowerShell(token) {
+  return Buffer.from(token, 'utf8').toString('base64');
+}
+
 function getServiceStrategies(serviceValue = DEFAULT_SERVICE) {
   const service = getServiceConfig(serviceValue);
   if (!service?.strategyValues?.length) {
@@ -442,14 +446,14 @@ function storeToken(token, serviceValue = DEFAULT_SERVICE) {
 
   if (process.platform === 'win32') {
     const tokenFile = getWindowsTokenFile(service.value);
+    const encodedToken = encodeTokenForPowerShell(token);
     fs.mkdirSync(path.dirname(tokenFile), {recursive: true});
     runPowerShell(
-      '$token = [Console]::In.ReadToEnd(); if ([string]::IsNullOrEmpty($token)) { throw "Token input is empty" }; $secure = ConvertTo-SecureString $token -AsPlainText -Force; $encrypted = ConvertFrom-SecureString $secure; Set-Content -Path $env:SCIONOS_TOKEN_FILE -Value $encrypted -NoNewline',
+      `$token = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${encodedToken}')); if ([string]::IsNullOrEmpty($token)) { throw "Token input is empty" }; $secure = ConvertTo-SecureString $token -AsPlainText -Force; $encrypted = ConvertFrom-SecureString $secure; Set-Content -Path $env:SCIONOS_TOKEN_FILE -Value $encrypted -NoNewline`,
       {
         env: {
           SCIONOS_TOKEN_FILE: tokenFile,
         },
-        input: token,
       },
     );
 
