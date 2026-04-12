@@ -93,6 +93,8 @@ Secure storage backends:
 - macOS: Keychain
 - Linux: Secret Service via `secret-tool`
 
+On Windows, if the secure token file is empty or corrupted, `claude-scionos` now treats it as missing instead of trying to use it. Run `claude-scionos auth login` again to store a fresh token.
+
 Manage the token with:
 
 ```bash
@@ -135,6 +137,7 @@ Common cases:
 - `Claude Code CLI not found`: install `@anthropic-ai/claude-code`
 - `Git Bash is required on Windows`: install Git for Windows
 - `ANTHROPIC_AUTH_TOKEN ... is required when using --no-prompt`: set the environment variable or store the token first
+- `Stored token` is missing on Windows even though you already logged in: re-run `claude-scionos auth login` because the local DPAPI token file may be empty or corrupted
 - `secret-tool not found`: install a Secret Service client on Linux or rely on the environment variable
 
 ## Development
