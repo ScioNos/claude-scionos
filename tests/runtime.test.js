@@ -1,8 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
-import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
+import { createAcpServer } from '../src/acp-server.js';
+import { assessStrategy, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
-import { normalizeEntrypointPath } from '../index.js';
+import * as indexModule from '../index.js';
+
+const {
+  isAcpMockEnabled,
+  normalizeEntrypointPath,
+  parseWrapperArgs,
+  resolveLaunchToken,
+} = indexModule;
 
 describe('proxy request handling', () => {
   it('keeps useful upstream headers while stripping hop-by-hop ones', () => {
@@ -152,5 +160,368 @@ describe('entrypoint detection', () => {
     const windowsRelative = relative.split(path.sep).join('\\');
 
     expect(normalizeEntrypointPath(windowsRelative)).toBe(normalizeEntrypointPath(absolute));
+  });
+});
+
+describe('ACP argument parsing', () => {
+  beforeEach(() => {
+    delete process.env.SCIONOS_ACP_MOCK;
+    vi.restoreAllMocks();
+  });
+
+  it('captures --acp as a wrapper-owned flag', () => {
+    const parsed = parseWrapperArgs(['--acp']);
+
+    expect(parsed.acpMode).toBe(true);
+    expect(parsed.claudeArgs).toEqual([]);
+  });
+
+  it('keeps forwarded Claude args while stripping wrapper ACP flags', () => {
+    const parsed = parseWrapperArgs(['--acp', '--strategy', 'aws', '-p', 'hello']);
+
+    expect(parsed.acpMode).toBe(true);
+    expect(parsed.strategy).toBe('aws');
+    expect(parsed.claudeArgs).toEqual(['-p', 'hello']);
+  });
+
+  it('enables ACP mock only with explicit env and ACP mode', () => {
+    const nonAcp = parseWrapperArgs([]);
+    const acp = parseWrapperArgs(['--acp']);
+
+    process.env.SCIONOS_ACP_MOCK = '1';
+
+    expect(isAcpMockEnabled(nonAcp)).toBe(false);
+    expect(isAcpMockEnabled(acp)).toBe(true);
+  });
+
+  it('returns a mock token for ACP no-prompt launches without credentials', async () => {
+    const serviceConfig = getServiceConfig();
+    vi.stubEnv('SCIONOS_ACP_MOCK', '1');
+    vi.spyOn(indexModule, 'validateToken').mockResolvedValue({
+      valid: false,
+      reason: 'bad gateway',
+    });
+
+    const result = await resolveLaunchToken(true, serviceConfig, { acpMock: true });
+
+    expect(result.token).toBe('scionos-acp-mock-token');
+    expect(result.source).toBe('mock-acp');
+    expect(result.validation.reason).toBe('mock_bypass');
+  });
+});
+
+describe('ACP server protocol', () => {
+  it('writes a claude-scionos-acp startup banner to the log file when started', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const logFilePath = path.join(os.tmpdir(), `claude-scionos-acp-${Date.now()}.log`);
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+        logFilePath,
+      });
+
+      const startPromise = server.start();
+      process.stdin.emit('end');
+      await startPromise;
+
+      const logContent = fs.readFileSync(logFilePath, 'utf8');
+      expect(logContent).toContain('[claude-scionos-acp] start');
+      expect(logContent).toContain('cliPath=claude');
+    } finally {
+      if (fs.existsSync(logFilePath)) {
+        fs.unlinkSync(logFilePath);
+      }
+    }
+  });
+
+  it('returns initialize metadata with conservative capabilities', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'initialize',
+        params: {},
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.jsonrpc).toBe('2.0');
+      expect(message.id).toBe(1);
+      expect(message.result.protocolVersion).toBe(1);
+      expect(message.result.capabilities).toEqual({
+        streaming: false,
+        tools: false,
+        prompts: true,
+        resources: false,
+      });
+      expect(message.result.serverInfo.name).toBe('claude-scionos');
+      expect(message.result.sessionId).toMatch(/^session-/);
+      expect(message.result.session_id).toBe(message.result.sessionId);
+      expect(message.result.id).toBe(message.result.sessionId);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('creates a session with session/new and keeps the same id in session/get', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'session/new',
+        params: {},
+      });
+
+      const created = JSON.parse(outputs.at(-1));
+      expect(created.result.sessionId).toMatch(/^session-/);
+
+      await server._test.handleRequest({
+        id: 2,
+        method: 'session/get',
+        params: {
+          session_id: created.result.session_id,
+        },
+      });
+
+      const fetched = JSON.parse(outputs.at(-1));
+      expect(fetched.result.sessionId).toBe(created.result.sessionId);
+      expect(fetched.result.session_id).toBe(created.result.session_id);
+      expect(fetched.result.id).toBe(created.result.id);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('rejects message/send before initialize', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          messages: [{ role: 'user', content: 'hello' }],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.error.code).toBe(-32002);
+      expect(message.error.message).toContain('not initialized');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('returns a mock response in ACP mock mode without spawning Claude', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+        mockMode: true,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'initialize',
+        params: {},
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          messages: [{ role: 'user', content: 'hello mock' }],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.id).toBe(2);
+      expect(message.result.content[0].text).toBe('ACP mock response: hello mock');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('returns a response for message/send after initialize', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: process.execPath,
+        claudeArgs: ['-e', "process.stdout.write('bonjour test'); process.exit(0);"],
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'initialize',
+        params: {},
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          messages: [{ role: 'user', content: 'hello' }],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.id).toBe(2);
+      expect(message.result.stopReason).toBe('end_turn');
+      expect(message.result.content[0].text).toBe('bonjour test');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('returns a response for message/send after session/new with ACP-style input', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: process.execPath,
+        claudeArgs: ['-e', "process.stdout.write('bonjour input'); process.exit(0);"],
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'session/new',
+        params: {
+          session_id: 'session-zed-test',
+        },
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'message/send',
+        params: {
+          session_id: 'session-zed-test',
+          input: [
+            {
+              role: 'user',
+              parts: [
+                { type: 'text', text: 'bonjour' },
+              ],
+            },
+          ],
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.id).toBe(2);
+      expect(message.result.sessionId).toBe('session-zed-test');
+      expect(message.result.content[0].text).toBe('bonjour input');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+  });
+
+  it('extracts prompt text from ACP input parts', () => {
+    const server = createAcpServer({
+      cliPath: 'claude',
+      env: process.env,
+    });
+
+    const prompt = server._test.extractPromptFromParams({
+      input: [
+        {
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'Salut' },
+            { type: 'text', text: 'Zed' },
+          ],
+        },
+      ],
+    });
+
+    expect(prompt).toBe('Salut\nZed');
+  });
+
+  it('returns an error when session/get requests an unknown session', async () => {
+    const outputs = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      outputs.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const server = createAcpServer({
+        cliPath: 'claude',
+        env: process.env,
+      });
+
+      await server._test.handleRequest({
+        id: 1,
+        method: 'session/new',
+        params: {
+          session_id: 'session-known',
+        },
+      });
+      await server._test.handleRequest({
+        id: 2,
+        method: 'session/get',
+        params: {
+          session_id: 'session-other',
+        },
+      });
+
+      const message = JSON.parse(outputs.at(-1));
+      expect(message.error.code).toBe(-32004);
+      expect(message.error.message).toContain('Unknown session');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
   });
 });

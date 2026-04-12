@@ -1,3 +1,4 @@
+
 node_modules
 .DS_Store
 .env
@@ -9,4 +10,4 @@ dist/
 .npm-cache/
 .npm-pack-cache/
 .tmp-home/
-
+logs/

@@ -1,0 +1,10 @@
+2026-04-07T11:22:07.564Z [claude-scionos-acp] start pid=6401 cwd=/Users/alaingaldemas/Documents/agentic/claude-scionos cliPath=/Users/alaingaldemas/.nvm/versions/node/v24.13.0/bin/claude mockMode=1 logFile=.scionos-acp.log
+2026-04-07T11:22:07.566Z [ACP IN] {"jsonrpc":"2.0","id":1,"method":"session/new","params":{}}
+2026-04-07T11:22:07.566Z [ACP OUT] {"jsonrpc":"2.0","id":1,"result":{"sessionId":"session-1775560927566-027hpmuzx","session_id":"session-1775560927566-027hpmuzx","id":"session-1775560927566-027hpmuzx","protocolVersion":1,"capabilities":{"streaming":false,"tools":false,"prompts":true,"resources":false},"serverInfo":{"name":"claude-scionos","version":"4.1.1","description":"ACP server wrapper for Claude Code with ScioNos routing"}}}
+2026-04-07T11:22:07.567Z [ACP] session/new -> session session-1775560927566-027hpmuzx
+2026-04-07T11:22:07.670Z [ACP IN] {"jsonrpc":"2.0","id":2,"method":"message/send","params":{"messages":[{"role":"user","content":"Hello"}]}}
+2026-04-07T11:22:07.670Z [ACP IN] message/send prompt="Hello"
+2026-04-07T11:22:07.670Z [ACP MOCK] Returning mock response for prompt (5 chars)
+2026-04-07T11:22:07.670Z [ACP OUT] {"jsonrpc":"2.0","id":2,"result":{"sessionId":"session-1775560927566-027hpmuzx","content":[{"type":"text","text":"ACP mock response: Hello"}],"stopReason":"end_turn"}}
+2026-04-07T11:22:08.178Z [ACP IN] {"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}
+2026-04-07T11:22:08.178Z [ACP OUT] {"jsonrpc":"2.0","id":3,"result":{"ok":true}}

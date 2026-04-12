@@ -5,22 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.1.4] - 2026-04-10
+## [Unreleased]
 
 ### Added
-- **LLM Strategy Coverage**: Added `claude-qwen3.6-plus` to the `llm` service menu.
-
-## [4.1.3] - 2026-04-07
-
-### Fixed
-- **LLM Strategy Availability**: Treat empty or non-exploitable model lists as unverified availability instead of blocking every strategy on `--service llm`.
-
-## [4.1.2] - 2026-04-07
+- **ACP Server MVP**: Replaced the provisional stdio bridge with a minimal ACP JSON-RPC server for Zed-compatible `initialize`, `message/send`, `cancel`, and `shutdown` flows.
 
 ### Changed
-- **Strategy Validation**: Added launch-readiness checks for every strategy, including full 3-model validation for `default` and `aws`.
-- **Billing Safety**: Removed silent fallback between groups so an unavailable strategy now fails explicitly instead of switching billing paths.
-- **Strategy Menu**: Added launch status indicators, blocked unavailable groups, reordered `routerlab` strategies, improved spacing, and expanded the menu to show all entries at once.
+- **ACP Capabilities**: Advertise conservative ACP capabilities and return empty `tools/list` and `prompts/list` responses until those surfaces are implemented.
+- **ACP Mock Testing**: Allow `SCIONOS_ACP_MOCK=1` to bypass RouterLab token validation only for explicit local ACP wrapper testing.
+- **Documentation**: Clarified the current ACP support level and Zed integration behavior in the English and French READMEs.
 
 ## [4.1.1] - 2026-04-03
 

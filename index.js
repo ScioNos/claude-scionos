@@ -47,6 +47,7 @@ import {
     validateToken
 } from './src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, startProxyServer } from './src/proxy.js';
+import { startAcpServer } from './src/acp-server.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
@@ -111,6 +112,7 @@ function showHelp() {
     console.log(`  ${chalk.cyan(`--service <${supportedServices}>`)}  Select the RouterLab access target (${chalk.white("llm")} is invitation-only)`);
     console.log(`  ${chalk.cyan("--no-prompt")}           Do not ask any interactive question`);
     console.log(`  ${chalk.cyan("--list-strategies")}     List strategies and availability`);
+    console.log(`  ${chalk.cyan("--acp")}                 Start non-interactive ACP mode for Zed/editor integrations`);
     console.log(`  ${chalk.cyan("--scionos-debug")}       Show proxy and launch diagnostics`);
     console.log("");
     console.log(chalk.gray("Examples"));
@@ -118,6 +120,7 @@ function showHelp() {
     console.log(`  ${chalk.cyan("claude-scionos auth login --service llm")}`);
     console.log(`  ${chalk.cyan("claude-scionos --service llm --strategy claude-glm-5")}`);
     console.log(`  ${chalk.cyan('claude-scionos --strategy aws --no-prompt -p "Summarize this repo"')}`);
+    console.log(`  ${chalk.cyan("claude-scionos --acp --no-prompt")}`);
     console.log(`  ${chalk.cyan("claude-scionos auth test")}`);
     console.log("");
     console.log(chalk.gray("Token sources"));
@@ -193,7 +196,8 @@ function parseWrapperArgs(argv) {
         noPrompt: false,
         service: normalizeServiceValue(process.env.SCIONOS_SERVICE),
         strategy: null,
-        version: false
+        version: false,
+        acpMode: false
     };
 
     for (let index = 0; index < argv.length; index += 1) {
@@ -218,6 +222,11 @@ function parseWrapperArgs(argv) {
 
         if (arg === '--version' || arg === '-v') {
             parsed.version = true;
+            continue;
+        }
+
+        if (arg === '--acp') {
+            parsed.acpMode = true;
             continue;
         }
 
@@ -290,7 +299,12 @@ function formatTokenSource(source) {
     if (source === 'environment') return 'environment';
     if (source === 'secure-store') return 'secure storage';
     if (source === 'manual') return 'manual input';
+    if (source === 'mock-acp') return 'ACP mock mode';
     return 'not available';
+}
+
+function isAcpMockEnabled(parsed) {
+    return parsed.acpMode && process.env.SCIONOS_ACP_MOCK === '1';
 }
 
 function installClaudeCode() {
@@ -345,7 +359,8 @@ async function maybeStoreToken(token, serviceConfig, replaceExisting = false) {
     console.log(chalk.green(`✓ Token saved securely in ${storage.backend}.`));
 }
 
-async function resolveLaunchToken(noPrompt, serviceConfig) {
+async function resolveLaunchToken(noPrompt, serviceConfig, options = {}) {
+    const { acpMock = false } = options;
     const candidate = getAvailableTokenCandidate(serviceConfig.value);
 
     if (candidate.token) {
@@ -360,6 +375,17 @@ async function resolveLaunchToken(noPrompt, serviceConfig) {
 
         const sourceLabel = formatTokenSource(candidate.source);
         if (noPrompt) {
+            if (acpMock) {
+                return {
+                    token: 'scionos-acp-mock-token',
+                    source: 'mock-acp',
+                    validation: {
+                        valid: false,
+                        reason: 'mock_bypass',
+                        models: null
+                    }
+                };
+            }
             throw new Error(`${sourceLabel} token is invalid: ${validation.message || validation.status || validation.reason}`);
         }
 
@@ -374,6 +400,17 @@ async function resolveLaunchToken(noPrompt, serviceConfig) {
     }
 
     if (noPrompt) {
+        if (acpMock) {
+            return {
+                token: 'scionos-acp-mock-token',
+                source: 'mock-acp',
+                validation: {
+                    valid: false,
+                    reason: 'mock_bypass',
+                    models: null
+                }
+            };
+        }
         throw new Error(`ANTHROPIC_AUTH_TOKEN or a securely stored token is required when using --no-prompt for ${serviceConfig.tokenPromptLabel}`);
     }
 
@@ -614,6 +651,7 @@ async function ensureClaudeInstallation(osInfo, interactive) {
 
 async function main() {
     const parsed = parseWrapperArgs(process.argv.slice(2));
+    const acpMode = parsed.acpMode;
 
     if (parsed.version) {
         console.log(pkg.version);
@@ -642,8 +680,9 @@ async function main() {
         process.exit(0);
     }
 
-    const interactive = !parsed.noPrompt;
+    const interactive = !parsed.noPrompt && !acpMode;
     const isDebug = parsed.debug;
+    const acpMock = isAcpMockEnabled(parsed);
 
     if (interactive) {
         showBanner();
@@ -661,12 +700,17 @@ async function main() {
         }
     }
 
-    const { token, source, validation } = await resolveLaunchToken(parsed.noPrompt, serviceConfig);
+    const { token, source, validation } = await resolveLaunchToken(parsed.noPrompt || acpMode, serviceConfig, {
+        acpMock
+    });
     if (interactive) {
         console.log(chalk.green(`✓ Using ${formatTokenSource(source)} token.`));
     }
 
-    const modelChoice = await resolveStrategyChoice(parsed, validation.models, serviceConfig);
+    const modelChoice = await resolveStrategyChoice({
+        ...parsed,
+        noPrompt: parsed.noPrompt || acpMode
+    }, validation.models, serviceConfig);
     let finalBaseUrl = serviceConfig.baseUrl;
     let proxyServer = null;
 
@@ -699,9 +743,30 @@ async function main() {
             `${chalk.white('Token source:')} ${formatTokenSource(source)}`,
             `${chalk.white('Strategy:')} ${modelChoice}`,
             `${chalk.white('Endpoint:')} ${finalBaseUrl}`,
-            `${chalk.white('Mode:')} ${parsed.noPrompt ? 'non-interactive' : 'guided'}`
+            `${chalk.white('Mode:')} ${acpMode ? 'acp' : parsed.noPrompt ? 'non-interactive' : 'guided'}`
         ]);
         console.log(chalk.green(`🚀 Launching Claude Code [${modelChoice}]...\n`));
+    }
+
+    if (acpMode) {
+        const logFilePath = process.env.SCIONOS_ACP_LOG_FILE || '.scionos-acp.log';
+        const exitCode = await startAcpServer({
+            cliPath: claudeStatus.cliPath,
+            claudeArgs: parsed.claudeArgs,
+            env,
+            debug: isDebug,
+            shell: process.platform === 'win32',
+            mockMode: acpMock,
+            logFilePath,
+            onDebug: (message) => console.error(chalk.gray(message)),
+            onError: (message) => console.error(chalk.red(message)),
+            onExit: () => {
+                if (proxyServer) {
+                    proxyServer.close();
+                }
+            }
+        });
+        return process.exit(exitCode);
     }
 
     const child = spawn(claudeStatus.cliPath, parsed.claudeArgs, {
@@ -759,9 +824,12 @@ export {
     buildProxyRequestOptions,
     canProceedWithValidation,
     installClaudeCode,
+    isAcpMockEnabled,
     main,
     normalizeEntrypointPath,
     normalizeProxyHeaders,
+    parseWrapperArgs,
+    resolveLaunchToken,
     startProxyServer,
     validateToken
 };
