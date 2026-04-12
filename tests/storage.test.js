@@ -57,4 +57,26 @@ describe('secure Windows token storage', () => {
 
     expect(() => storeToken('dummy-token')).toThrow('Secure token file was created but no encrypted content was written');
   });
+
+  it('passes the Windows token through stdin when storing it', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.statSync).mockReturnValue({size: 12});
+    vi.mocked(spawnSync).mockReturnValue({status: 0, stdout: '', stderr: ''});
+
+    const {storeToken} = await import('../src/routerlab.js');
+
+    storeToken('dummy-token');
+
+    expect(spawnSync).toHaveBeenCalledWith(
+      expect.stringContaining('powershell.exe'),
+      ['-NoProfile', '-NonInteractive', '-Command', expect.stringContaining('[Console]::In.ReadToEnd()')],
+      expect.objectContaining({
+        encoding: 'utf8',
+        input: 'dummy-token',
+        env: expect.objectContaining({
+          SCIONOS_TOKEN_FILE: 'C:\\Users\\tester\\.claude-scionos\\routerlab-token.secure.txt',
+        }),
+      }),
+    );
+  });
 });

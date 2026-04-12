@@ -386,13 +386,18 @@ function commandExists(command) {
   return !result.error;
 }
 
-function runPowerShell(command, env = {}) {
+function runPowerShell(command, options = {}) {
+  const {
+    env = {},
+    input,
+  } = options;
   const powershell = process.env.SystemRoot
     ? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
     : 'powershell.exe';
 
   const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', command], {
     encoding: 'utf8',
+    input,
     env: {
       ...process.env,
       ...env,
@@ -439,10 +444,12 @@ function storeToken(token, serviceValue = DEFAULT_SERVICE) {
     const tokenFile = getWindowsTokenFile(service.value);
     fs.mkdirSync(path.dirname(tokenFile), {recursive: true});
     runPowerShell(
-      '$secure = ConvertTo-SecureString $env:SCIONOS_TOKEN -AsPlainText -Force; $encrypted = ConvertFrom-SecureString $secure; Set-Content -Path $env:SCIONOS_TOKEN_FILE -Value $encrypted -NoNewline',
+      '$token = [Console]::In.ReadToEnd(); if ([string]::IsNullOrEmpty($token)) { throw "Token input is empty" }; $secure = ConvertTo-SecureString $token -AsPlainText -Force; $encrypted = ConvertFrom-SecureString $secure; Set-Content -Path $env:SCIONOS_TOKEN_FILE -Value $encrypted -NoNewline',
       {
-        SCIONOS_TOKEN: token,
-        SCIONOS_TOKEN_FILE: tokenFile,
+        env: {
+          SCIONOS_TOKEN_FILE: tokenFile,
+        },
+        input: token,
       },
     );
 
@@ -514,7 +521,9 @@ function getStoredToken(serviceValue = DEFAULT_SERVICE) {
     const token = runPowerShell(
       '$secure = Get-Content -Path $env:SCIONOS_TOKEN_FILE -Raw | ConvertTo-SecureString; $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }',
       {
-        SCIONOS_TOKEN_FILE: tokenFile,
+        env: {
+          SCIONOS_TOKEN_FILE: tokenFile,
+        },
       },
     );
     return token || null;
