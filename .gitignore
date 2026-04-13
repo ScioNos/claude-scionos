@@ -9,4 +9,5 @@ dist/
 .npm-cache/
 .npm-pack-cache/
 .tmp-home/
+.claude/
 
