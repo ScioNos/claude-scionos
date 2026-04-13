@@ -79,6 +79,9 @@ describe('secure Windows token storage', () => {
       ['-NoProfile', '-NonInteractive', '-Command', expect.stringContaining("[System.Convert]::FromBase64String('ZW5jcnlwdGVkLXRva2Vu')")],
       expect.objectContaining({
         encoding: 'utf8',
+        env: expect.objectContaining({
+          PSModulePath: 'C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\Modules',
+        }),
       }),
     );
   });
@@ -99,6 +102,7 @@ describe('secure Windows token storage', () => {
       expect.objectContaining({
         encoding: 'utf8',
         env: expect.objectContaining({
+          PSModulePath: 'C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\Modules',
         }),
       }),
     );

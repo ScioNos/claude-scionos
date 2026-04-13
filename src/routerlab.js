@@ -36,6 +36,10 @@ const BASE_URL = SERVICES[DEFAULT_SERVICE].baseUrl;
 const TOKEN_HELP_URL = SERVICES[DEFAULT_SERVICE].tokenHelpUrl;
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
 const SECURE_STORAGE_SERVICE = 'claude-scionos';
+const WINDOWS_POWERSHELL_MODULE_PATHS = [
+  'C:\\Program Files\\WindowsPowerShell\\Modules',
+  'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\Modules',
+];
 const SECURE_STORAGE_ACCOUNT = SERVICES[DEFAULT_SERVICE].secureStorageAccount;
 const DEFAULT_CLAUDE_MODELS = [
   'claude-haiku-4-5-20251001',
@@ -415,14 +419,16 @@ function runPowerShell(command, options = {}) {
   const powershell = process.env.SystemRoot
     ? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
     : 'powershell.exe';
+  const childEnv = {
+    ...process.env,
+    ...(process.platform === 'win32' ? {PSModulePath: WINDOWS_POWERSHELL_MODULE_PATHS.join(';')} : {}),
+    ...env,
+  };
 
   const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', command], {
     encoding: 'utf8',
     input,
-    env: {
-      ...process.env,
-      ...env,
-    },
+    env: childEnv,
   });
 
   if (result.error) {

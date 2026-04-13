@@ -137,7 +137,7 @@ Cas courants :
 - `Claude Code CLI not found` : installer `@anthropic-ai/claude-code`
 - `Git Bash is required on Windows` : installer Git for Windows
 - `ANTHROPIC_AUTH_TOKEN ... is required when using --no-prompt` : définir la variable d'environnement ou stocker le token au préalable
-- `Secure token file was created but no encrypted content was written` : mettre à jour vers `4.1.9` ou plus récent, puis relancer `claude-scionos auth login`
+- `Secure token file was created but no encrypted content was written` : mettre à jour vers `4.1.10` ou plus récent, puis relancer `claude-scionos auth login`
 - `Stored token` est indiqué comme absent sous Windows alors qu'un login a déjà été fait : relancer `claude-scionos auth login`, car le fichier DPAPI local peut être vide ou corrompu
 - `secret-tool not found` : installer un client Secret Service sous Linux ou utiliser la variable d'environnement
 
