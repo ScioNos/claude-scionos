@@ -7,7 +7,10 @@ vi.mock('node:fs', () => ({
   default: {
     existsSync: vi.fn(),
     mkdirSync: vi.fn(),
+    readFileSync: vi.fn(),
     statSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    writeFileSync: vi.fn(),
   },
 }));
 
@@ -58,10 +61,33 @@ describe('secure Windows token storage', () => {
     expect(() => storeToken('dummy-token')).toThrow('Secure token file was created but no encrypted content was written');
   });
 
+  it('reads the Windows token file in Node before decrypting it in PowerShell', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({size: 18});
+    vi.mocked(fs.readFileSync).mockReturnValue('encrypted-token');
+    vi.mocked(spawnSync).mockReturnValue({status: 0, stdout: 'plain-token', stderr: ''});
+
+    const {getStoredToken} = await import('../src/routerlab.js');
+
+    expect(getStoredToken()).toBe('plain-token');
+    expect(fs.readFileSync).toHaveBeenCalledWith(
+      'C:\\Users\\tester\\.claude-scionos\\routerlab-token.secure.txt',
+      'utf8',
+    );
+    expect(spawnSync).toHaveBeenCalledWith(
+      expect.stringContaining('powershell.exe'),
+      ['-NoProfile', '-NonInteractive', '-Command', expect.stringContaining("[System.Convert]::FromBase64String('ZW5jcnlwdGVkLXRva2Vu')")],
+      expect.objectContaining({
+        encoding: 'utf8',
+      }),
+    );
+  });
+
   it('encodes the Windows token in base64 when storing it', async () => {
     vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
     vi.mocked(fs.statSync).mockReturnValue({size: 12});
-    vi.mocked(spawnSync).mockReturnValue({status: 0, stdout: '', stderr: ''});
+    vi.mocked(spawnSync).mockReturnValue({status: 0, stdout: 'encrypted-token', stderr: ''});
 
     const {storeToken} = await import('../src/routerlab.js');
 
@@ -73,9 +99,13 @@ describe('secure Windows token storage', () => {
       expect.objectContaining({
         encoding: 'utf8',
         env: expect.objectContaining({
-          SCIONOS_TOKEN_FILE: 'C:\\Users\\tester\\.claude-scionos\\routerlab-token.secure.txt',
         }),
       }),
+    );
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      'C:\\Users\\tester\\.claude-scionos\\routerlab-token.secure.txt',
+      'encrypted-token',
+      'utf8',
     );
   });
 });

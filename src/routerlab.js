@@ -465,14 +465,10 @@ function storeToken(token, serviceValue = DEFAULT_SERVICE) {
     const tokenFile = getWindowsTokenFile(service.value);
     const encodedToken = encodeTokenForPowerShell(token);
     fs.mkdirSync(path.dirname(tokenFile), {recursive: true});
-    runPowerShell(
-      `$token = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${encodedToken}')); if ([string]::IsNullOrEmpty($token)) { throw "Token input is empty" }; $secure = ConvertTo-SecureString $token -AsPlainText -Force; $encrypted = ConvertFrom-SecureString $secure; Set-Content -Path $env:SCIONOS_TOKEN_FILE -Value $encrypted -NoNewline`,
-      {
-        env: {
-          SCIONOS_TOKEN_FILE: tokenFile,
-        },
-      },
+    const encrypted = runPowerShell(
+      `$token = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${encodedToken}')); if ([string]::IsNullOrEmpty($token)) { throw "Token input is empty" }; $secure = ConvertTo-SecureString $token -AsPlainText -Force; ConvertFrom-SecureString $secure`,
     );
+    fs.writeFileSync(tokenFile, encrypted, 'utf8');
 
     if (!hasNonEmptyWindowsTokenFile(tokenFile)) {
       throw new Error('Secure token file was created but no encrypted content was written');
@@ -539,13 +535,14 @@ function getStoredToken(serviceValue = DEFAULT_SERVICE) {
       return null;
     }
 
+    const encrypted = fs.readFileSync(tokenFile, 'utf8').trim();
+    if (!encrypted) {
+      return null;
+    }
+
+    const encodedEncrypted = encodeTokenForPowerShell(encrypted);
     const token = runPowerShell(
-      '$secure = Get-Content -Path $env:SCIONOS_TOKEN_FILE -Raw | ConvertTo-SecureString; $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }',
-      {
-        env: {
-          SCIONOS_TOKEN_FILE: tokenFile,
-        },
-      },
+      `$secure = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${encodedEncrypted}')) | ConvertTo-SecureString; $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }`,
     );
     return token || null;
   }

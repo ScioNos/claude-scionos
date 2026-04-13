@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.9] - 2026-04-13
+
+### Fixed
+- **Windows Secure Token Save**: Stop relying on PowerShell file writes for DPAPI storage. The launcher now lets PowerShell only encrypt and decrypt the token while Node.js writes and reads the secure token file directly, fixing the `Secure token file was created but no encrypted content was written` failure on Windows.
+
 ## [4.1.8] - 2026-04-13
 
 ### Fixed

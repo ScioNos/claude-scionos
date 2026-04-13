@@ -93,7 +93,7 @@ Backends de stockage sécurisés :
 - macOS : Keychain
 - Linux : Secret Service via `secret-tool`
 
-Sous Windows, si le fichier local du token est vide ou corrompu, `claude-scionos` le traite désormais comme absent au lieu d'essayer de l'utiliser. Il faut relancer `claude-scionos auth login` pour enregistrer un nouveau token.
+Sous Windows, `claude-scionos` laisse maintenant PowerShell gérer uniquement le chiffrement et le déchiffrement DPAPI, tandis que Node.js écrit et lit directement le fichier sécurisé. Cela corrige le cas où le fichier du token était créé mais restait vide. Si un ancien fichier local est vide ou corrompu, `claude-scionos` le traite comme absent au lieu d'essayer de l'utiliser. Il faut relancer `claude-scionos auth login` pour enregistrer un nouveau token.
 
 Gestion du token :
 
@@ -137,6 +137,7 @@ Cas courants :
 - `Claude Code CLI not found` : installer `@anthropic-ai/claude-code`
 - `Git Bash is required on Windows` : installer Git for Windows
 - `ANTHROPIC_AUTH_TOKEN ... is required when using --no-prompt` : définir la variable d'environnement ou stocker le token au préalable
+- `Secure token file was created but no encrypted content was written` : mettre à jour vers `4.1.9` ou plus récent, puis relancer `claude-scionos auth login`
 - `Stored token` est indiqué comme absent sous Windows alors qu'un login a déjà été fait : relancer `claude-scionos auth login`, car le fichier DPAPI local peut être vide ou corrompu
 - `secret-tool not found` : installer un client Secret Service sous Linux ou utiliser la variable d'environnement
 
