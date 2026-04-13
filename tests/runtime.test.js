@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices } from '../src/routerlab.js';
+import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices, hasExploitableModelIds } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
 import { normalizeEntrypointPath } from '../index.js';
 
@@ -79,6 +79,15 @@ describe('strategy metadata', () => {
     expect(assessStrategy('claude-gpt-5.4', []).level).toBe('unknown');
     expect(assessStrategyLaunch('claude-gpt-5.4', []).ready).toBe(true);
     expect(getFallbackStrategy('claude-gpt-5.4', [])).toBe('claude-gpt-5.4');
+  });
+
+  it('treats non-exploitable llm model lists as unverified instead of blocked', () => {
+    const unrelatedModels = ['claude-sonnet-4-6', 'claude-opus-4-6'];
+
+    expect(hasExploitableModelIds(unrelatedModels, 'llm')).toBe(false);
+    expect(assessStrategy('claude-gpt-5.4', unrelatedModels, 'llm').level).toBe('unknown');
+    expect(assessStrategyLaunch('claude-gpt-5.4', unrelatedModels, 'llm').ready).toBe(true);
+    expect(getFallbackStrategy('claude-gpt-5.4', unrelatedModels, 'llm')).toBe('claude-gpt-5.4');
   });
 
   it('blocks default and aws when one of the required launch models is missing', () => {

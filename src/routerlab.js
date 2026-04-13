@@ -234,6 +234,23 @@ function hasVerifiedModelIds(modelIds) {
   return Array.isArray(modelIds) && modelIds.length > 0;
 }
 
+function hasExploitableModelIds(modelIds, serviceValue = DEFAULT_SERVICE) {
+  if (!hasVerifiedModelIds(modelIds)) {
+    return false;
+  }
+
+  const serviceStrategies = getServiceStrategies(serviceValue);
+  const knownModelIds = new Set(
+    serviceStrategies.flatMap((strategy) => getRequiredModels(strategy)),
+  );
+
+  if (knownModelIds.size === 0) {
+    return false;
+  }
+
+  return modelIds.some((modelId) => knownModelIds.has(modelId));
+}
+
 function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
   const serviceLabel = getServiceLabel(serviceValue);
   const strategy = findStrategy(strategyValue, serviceValue);
@@ -256,7 +273,7 @@ function assessStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SER
     };
   }
 
-  if (!hasVerifiedModelIds(modelIds)) {
+  if (!hasExploitableModelIds(modelIds, serviceValue)) {
     return {
       available: true,
       level: 'unknown',
@@ -316,7 +333,7 @@ function assessStrategyLaunch(strategyValue, modelIds = [], serviceValue = DEFAU
     };
   }
 
-  if (!requiredModels.length || !hasVerifiedModelIds(modelIds)) {
+  if (!requiredModels.length || !hasExploitableModelIds(modelIds, serviceValue)) {
     return {
       ready: availability.level !== 'unavailable',
       note: availability.note,
@@ -351,7 +368,7 @@ function assessStrategyLaunch(strategyValue, modelIds = [], serviceValue = DEFAU
 }
 
 function getFallbackStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
-  if (hasVerifiedModelIds(modelIds)) {
+  if (hasExploitableModelIds(modelIds, serviceValue)) {
     return assessStrategyLaunch(strategyValue, modelIds, serviceValue).ready ? strategyValue : null;
   }
 
@@ -628,6 +645,7 @@ export {
   getServiceStrategies,
   getStoredToken,
   getStoredTokenStatus,
+  hasExploitableModelIds,
   getStrategyChoices,
   hasVerifiedModelIds,
   listStrategies,
