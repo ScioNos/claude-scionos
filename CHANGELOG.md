@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-04-14
+
+### Added
+- **RouterLab Coverage**: Added `claude-gpt-5.4` to the `routerlab` service menu while keeping the invitation-only `llm` service support for `claude-gpt-5.4` and `claude-qwen3.6-plus`.
+
+### Changed
+- **Strategy Launch Safety**: Keep strategy availability service-aware so unverified or unrelated model lists do not block launches on `routerlab` or `llm`.
+- **CLI Surface**: Kept the lighter interactive CLI flow after removing the heavier in-progress UX rewrite before release.
+
+### Fixed
+- **Windows Secure Token Save**: Keep Windows DPAPI token storage on the native Windows PowerShell security module path so secure token writes and reads stay reliable.
+- **Proxy Hardening**: Limit the local proxy to authorized `POST /v1/messages` requests and strip the local proxy secret before forwarding upstream.
+
+### Documentation
+- **Release Alignment**: Bumped the published package metadata to `4.2.0` and aligned the English and French READMEs with the current release.
+
 ## [4.1.10] - 2026-04-13
 
 ### Fixed

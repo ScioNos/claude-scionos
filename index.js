@@ -306,12 +306,6 @@ async function promptAndValidateToken(promptMessage, serviceConfig) {
     const serviceBaseUrl = resolveServiceBaseUrl(serviceConfig.value);
 
     while (true) {
-        if (serviceConfig.tokenHelpUrl) {
-            console.log(chalk.blueBright(`To retrieve your token, visit: ${serviceConfig.tokenHelpUrl}`));
-        } else if (serviceConfig.tokenHelpMessage) {
-            console.log(chalk.blueBright(serviceConfig.tokenHelpMessage));
-        }
-
         const token = await password({
             message: promptMessage,
             mask: '*'
@@ -319,18 +313,17 @@ async function promptAndValidateToken(promptMessage, serviceConfig) {
 
         const formatValidation = validateTokenFormat(token);
         if (!formatValidation.valid) {
-            console.log(chalk.red(`❌ ${formatValidation.message} Try again.`));
+            console.log(chalk.red(`✗ ${formatValidation.message}\n`));
             continue;
         }
 
-        console.log(chalk.gray("Validating token..."));
         const validation = await validateToken(token, { baseUrl: serviceBaseUrl, serviceValue: serviceConfig.value });
         if (canProceedWithValidation(validation)) {
-            console.log(chalk.green("✓ Token validated."));
+            console.log(chalk.green(`✓ ${serviceConfig.tokenPromptLabel} token validated.`));
             return { token, validation };
         }
 
-        console.log(chalk.red(`❌ Token validation failed: ${validation.message || validation.status || validation.reason}. Try again.`));
+        console.log(chalk.red(`✗ Token invalid: ${validation.message || validation.status || validation.reason}\n`));
     }
 }
 
@@ -426,7 +419,7 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
         if (hasVerifiedModelIds(modelIds)) {
             const availability = assessStrategy(selected, modelIds, serviceConfig.value);
             if (availability.level === 'partial') {
-                console.log(chalk.yellow(`⚠ Strategy "${selected}" is only partially available on ${serviceConfig.availabilityLabel}.`));
+                console.log(chalk.yellow(`WARN Strategy "${selected}" is only partially available on ${serviceConfig.availabilityLabel}.`));
             }
         }
 
@@ -449,12 +442,12 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
     const strategyChoices = getStrategyChoices(modelIds, serviceConfig.value).map((choice) => {
         const launchReadiness = assessStrategyLaunch(choice.value, modelIds, serviceConfig.value);
         const disabled = hasVerifiedModelIds(modelIds) && !launchReadiness.ready ? launchReadiness.note : false;
-
         return {
             ...choice,
             disabled,
             name: `${getStrategyIndicator(choice.value, modelIds, serviceConfig.value)} ${getStrategyMenuLabel(choice.value)}`,
-            short: getStrategyMenuLabel(choice.value)
+            short: getStrategyMenuLabel(choice.value),
+            description: launchReadiness.note
         };
     });
 
@@ -479,12 +472,7 @@ function showStrategies(modelIds = null, serviceConfig) {
     const strategies = listStrategies(modelIds, serviceConfig.value);
     showSection('Strategies', strategies.map((strategy) => {
         const indicator = getStrategyIndicator(strategy.value, modelIds, serviceConfig.value);
-        const state = !hasVerifiedModelIds(modelIds)
-            ? chalk.gray('Unknown')
-            : assessStrategyLaunch(strategy.value, modelIds, serviceConfig.value).ready
-                ? chalk.green('Ready')
-                : chalk.red('Blocked');
-        return `${indicator} ${chalk.white(strategy.name)}  ${state}  ${chalk.gray(`(${strategy.value})`)}\n    ${strategy.description} ${strategy.availability.note}`.trimEnd();
+        return `${indicator} ${chalk.white(getStrategyMenuLabel(strategy.value))} ${chalk.gray(`(${strategy.value})`)}\n    ${strategy.description}`;
     }));
 }
 
@@ -506,7 +494,7 @@ async function runAuthCommand(action, serviceConfig) {
 
     if (action === 'logout') {
         const removed = deleteStoredToken(serviceConfig.value);
-        console.log(removed ? chalk.green('✓ Stored token removed.') : chalk.yellow('⚠ No stored token was found.'));
+        console.log(removed ? chalk.green('OK Stored token removed.') : chalk.yellow('WARN No stored token was found.'));
         return;
     }
 
@@ -517,14 +505,14 @@ async function runAuthCommand(action, serviceConfig) {
 
         const prompted = await promptAndValidateToken(`Enter the ${serviceConfig.tokenPromptLabel} token to save securely:`, serviceConfig);
         storeToken(prompted.token, serviceConfig.value);
-        console.log(chalk.green(`✓ Token saved securely in ${storage.backend}.`));
+        console.log(chalk.green(`OK Token saved securely in ${storage.backend}.`));
         return;
     }
 
     if (action === 'test') {
         const candidate = getAvailableTokenCandidate(serviceConfig.value);
         if (!candidate.token) {
-            console.log(chalk.yellow('⚠ No environment token or stored token is available.'));
+            console.log(chalk.yellow('WARN No environment token or stored token is available.'));
             return;
         }
 
@@ -533,8 +521,8 @@ async function runAuthCommand(action, serviceConfig) {
             serviceValue: serviceConfig.value
         });
         console.log(canProceedWithValidation(validation)
-            ? chalk.green(`✓ ${formatTokenSource(candidate.source)} token is valid.`)
-            : chalk.red(`❌ ${formatTokenSource(candidate.source)} token is invalid: ${validation.message || validation.status || validation.reason}`));
+            ? chalk.green(`OK ${formatTokenSource(candidate.source)} token is valid for ${serviceConfig.label}.`)
+            : chalk.red(`FAIL ${formatTokenSource(candidate.source)} token is invalid for ${serviceConfig.label}: ${validation.message || validation.status || validation.reason}`));
 
         if (canProceedWithValidation(validation)) {
             showStrategies(validation.models, serviceConfig);
@@ -569,16 +557,19 @@ async function runDoctor(serviceConfig) {
     console.log('');
 
     const candidate = getAvailableTokenCandidate(serviceConfig.value);
+    let validation = null;
+
     if (!candidate.token) {
         showStatus(`${serviceConfig.tokenPromptLabel} auth`, 'warn', 'Skipped: no environment or stored token available');
-        console.log('');
-        return;
+    } else {
+        validation = await validateToken(candidate.token, {
+            baseUrl: resolveServiceBaseUrl(serviceConfig.value),
+            serviceValue: serviceConfig.value
+        });
+        showStatus(`${serviceConfig.tokenPromptLabel} auth`, canProceedWithValidation(validation) ? 'ok' : 'error', canProceedWithValidation(validation)
+            ? `validated via ${formatTokenSource(candidate.source)} token`
+            : validation.message || validation.status || validation.reason);
     }
-
-    const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
-    showStatus(`${serviceConfig.tokenPromptLabel} auth`, canProceedWithValidation(validation) ? 'ok' : 'error', canProceedWithValidation(validation)
-        ? `validated via ${formatTokenSource(candidate.source)} token`
-        : validation.message || validation.status || validation.reason);
     console.log('');
 
     if (canProceedWithValidation(validation)) {
@@ -591,18 +582,14 @@ async function runListStrategies(serviceConfig) {
     const candidate = getAvailableTokenCandidate(serviceConfig.value);
     if (!candidate.token) {
         showStrategies(null, serviceConfig);
-        console.log(chalk.gray(`Tip: save a token with \`claude-scionos auth login${serviceConfig.value === DEFAULT_SERVICE ? '' : ` --service ${serviceConfig.value}`}\` to verify availability live.`));
         return;
     }
 
-    const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
-    if (canProceedWithValidation(validation)) {
-        showStrategies(validation.models, serviceConfig);
-        return;
-    }
-
-    console.log(chalk.yellow(`⚠ Unable to verify strategy availability with the ${formatTokenSource(candidate.source)} token.`));
-    showStrategies(null, serviceConfig);
+    const validation = await validateToken(candidate.token, {
+        baseUrl: resolveServiceBaseUrl(serviceConfig.value),
+        serviceValue: serviceConfig.value
+    });
+    showStrategies(canProceedWithValidation(validation) ? validation.models : null, serviceConfig);
 }
 
 async function ensureClaudeInstallation(osInfo, interactive) {
