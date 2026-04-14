@@ -14,6 +14,8 @@ const HOP_BY_HOP_HEADERS = new Set([
   'transfer-encoding',
   'upgrade',
 ]);
+const PROXY_AUTH_HEADER = 'x-scionos-proxy-secret';
+const MESSAGES_PATH = '/v1/messages';
 
 function normalizeProxyHeaders(headers) {
   const normalizedHeaders = {};
@@ -32,6 +34,7 @@ function normalizeProxyHeaders(headers) {
 function buildProxyRequestOptions(url, method, upstreamHeaders, validToken, bodyLength, timeout) {
   const headers = normalizeProxyHeaders(upstreamHeaders);
   delete headers.authorization;
+  delete headers[PROXY_AUTH_HEADER];
   headers['x-api-key'] = validToken;
   headers['anthropic-version'] ??= DEFAULT_ANTHROPIC_VERSION;
 
@@ -72,6 +75,22 @@ function writeJsonError(res, statusCode, payload) {
 
   res.writeHead(statusCode);
   res.end(JSON.stringify(payload));
+}
+
+function getRequestPath(req) {
+  return new URL(req.url, 'http://127.0.0.1').pathname;
+}
+
+function isAuthorizedProxyRequest(req, proxySecret) {
+  if (!proxySecret) {
+    return true;
+  }
+
+  return req.headers[PROXY_AUTH_HEADER] === proxySecret;
+}
+
+function isAllowedProxyRoute(req) {
+  return req.method === 'POST' && getRequestPath(req) === MESSAGES_PATH;
 }
 
 async function handleMessageRequest(req, res, options) {
@@ -123,7 +142,7 @@ async function handleMessageRequest(req, res, options) {
         validToken,
       });
     } catch (error) {
-      onError(`[Proxy Error] POST /messages: ${error.message}`);
+      onError(`[Proxy Error] POST ${MESSAGES_PATH}: ${error.message}`);
       writeJsonError(res, 500, {
         error: {
           message: 'Scionos Proxy Error',
@@ -162,9 +181,9 @@ async function forwardRequest(req, res, options) {
       onError(`[Proxy Error] Code: ${error.code}`);
     }
 
-    writeJsonError(res, req.method === 'POST' && req.url.includes('/messages') ? 500 : 502, {
+    writeJsonError(res, req.method === 'POST' && getRequestPath(req) === MESSAGES_PATH ? 500 : 502, {
       error: {
-        message: req.method === 'POST' && req.url.includes('/messages')
+        message: req.method === 'POST' && getRequestPath(req) === MESSAGES_PATH
           ? 'Proxy Error'
           : 'Scionos Proxy Error: Failed to connect to upstream',
         details: error.message,
@@ -201,47 +220,28 @@ function startProxyServer(targetModel, validToken, options = {}) {
     debug = false,
     onDebug = () => {},
     onError = () => {},
+    proxySecret = null,
   } = options;
 
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      if (req.method === 'OPTIONS') {
-        res.writeHead(200, {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-          'Access-Control-Allow-Headers': '*',
-        });
-        res.end();
+      if (!isAuthorizedProxyRequest(req, proxySecret)) {
+        writeJsonError(res, 403, {error: {message: 'Forbidden'}});
         return;
       }
 
-      if (req.method === 'POST' && req.url.includes('/messages')) {
-        handleMessageRequest(req, res, {
-          baseUrl,
-          debug,
-          onDebug,
-          onError,
-          targetModel,
-          validToken,
-        });
+      if (!isAllowedProxyRoute(req)) {
+        writeJsonError(res, 404, {error: {message: 'Not Found'}});
         return;
       }
 
-      forwardRequest(req, res, {
+      handleMessageRequest(req, res, {
         baseUrl,
         debug,
         onDebug,
         onError,
-        timeout: 60000,
+        targetModel,
         validToken,
-      }).catch((error) => {
-        onError(`[Proxy Error] ${req.method} ${req.url}: ${error.message}`);
-        writeJsonError(res, 502, {
-          error: {
-            message: 'Scionos Proxy Error: Failed to connect to upstream',
-            details: error.message,
-          },
-        });
       });
     });
 
@@ -257,6 +257,8 @@ function startProxyServer(targetModel, validToken, options = {}) {
 export {
   buildProxyRequestOptions,
   normalizeProxyHeaders,
+  PROXY_AUTH_HEADER,
   resolveMappedModel,
   startProxyServer,
 };
+

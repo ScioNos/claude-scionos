@@ -46,7 +46,7 @@ import {
     storeToken,
     validateToken
 } from './src/routerlab.js';
-import { buildProxyRequestOptions, normalizeProxyHeaders, startProxyServer } from './src/proxy.js';
+import { startProxyServer } from './src/proxy.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
@@ -756,12 +756,9 @@ if (isEntrypoint) {
 }
 
 export {
-    buildProxyRequestOptions,
     canProceedWithValidation,
     installClaudeCode,
     main,
     normalizeEntrypointPath,
-    normalizeProxyHeaders,
-    startProxyServer,
     validateToken
 };

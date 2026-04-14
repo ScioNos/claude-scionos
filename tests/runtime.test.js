@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices, hasExploitableModelIds } from '../src/routerlab.js';
-import { buildProxyRequestOptions, normalizeProxyHeaders, resolveMappedModel } from '../src/proxy.js';
+import { buildProxyRequestOptions, normalizeProxyHeaders, PROXY_AUTH_HEADER, resolveMappedModel } from '../src/proxy.js';
 import { normalizeEntrypointPath } from '../index.js';
 
 describe('proxy request handling', () => {
@@ -21,7 +21,7 @@ describe('proxy request handling', () => {
     });
   });
 
-  it('overrides auth headers and recomputes content length', () => {
+  it('overrides auth headers, strips the local proxy secret, and recomputes content length', () => {
     const options = buildProxyRequestOptions(
       new URL('https://routerlab.ch/v1/messages'),
       'POST',
@@ -31,6 +31,7 @@ describe('proxy request handling', () => {
         'anthropic-version': '2024-10-22',
         'content-type': 'application/json',
         'x-api-key': 'stale-token',
+        [PROXY_AUTH_HEADER]: 'session-secret',
       },
       'fresh-token',
       42,
