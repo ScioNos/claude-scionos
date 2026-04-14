@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
-import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices, hasExploitableModelIds } from '../src/routerlab.js';
+import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices, hasExploitableModelIds, resolveServiceBaseUrl, validateTokenFormat } from '../src/routerlab.js';
 import { buildProxyRequestOptions, normalizeProxyHeaders, PROXY_AUTH_HEADER, resolveMappedModel } from '../src/proxy.js';
-import { normalizeEntrypointPath } from '../index.js';
+import { normalizeEntrypointPath, resolveLaunchToken } from '../index.js';
 
 describe('proxy request handling', () => {
   it('keeps useful upstream headers while stripping hop-by-hop ones', () => {
@@ -152,6 +152,47 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt-5.4');
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt-5.4');
     expect(getFallbackStrategy('claude-qwen3.6-plus', ['claude-qwen3.6-plus'], 'llm')).toBe('claude-qwen3.6-plus');
+  });
+});
+
+describe('wrapper validation helpers', () => {
+  const routerlabConfig = getServiceConfig('routerlab');
+
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('rejects obviously invalid token formats locally', () => {
+    expect(validateTokenFormat('')).toEqual({
+      valid: false,
+      reason: 'missing',
+      message: 'Token is required.',
+    });
+    expect(validateTokenFormat('short-token')).toEqual({
+      valid: false,
+      reason: 'too_short',
+      message: 'Token seems invalid (too short).',
+    });
+    expect(validateTokenFormat('valid-token-with-enough-length')).toEqual({valid: true});
+  });
+
+  it('resolves service base URLs with and without environment override', () => {
+    expect(resolveServiceBaseUrl('routerlab', {})).toBe('https://routerlab.ch');
+    expect(resolveServiceBaseUrl('llm', {})).toBe('https://llm.routerlab.ch');
+    expect(resolveServiceBaseUrl('routerlab', {ANTHROPIC_BASE_URL: 'https://override.example'})).toBe('https://override.example');
+  });
+
+  it('fails fast in no-prompt mode when the token format is obviously invalid', async () => {
+    vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'short-token');
+
+    await expect(resolveLaunchToken(true, routerlabConfig)).rejects.toThrow(
+      'environment token is invalid: Token seems invalid (too short).',
+    );
   });
 });
 

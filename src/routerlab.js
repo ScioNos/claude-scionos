@@ -102,7 +102,8 @@ const STRATEGIES = [
 
 async function fetchModels(apiKey, options = {}) {
   const {
-    baseUrl = BASE_URL,
+    serviceValue = DEFAULT_SERVICE,
+    baseUrl = resolveServiceBaseUrl(serviceValue),
     anthropicVersion = DEFAULT_ANTHROPIC_VERSION,
     timeoutMs = 30000,
   } = options;
@@ -188,6 +189,24 @@ function normalizeServiceValue(serviceValue) {
 
 function getServiceConfig(serviceValue = DEFAULT_SERVICE) {
   return SERVICES[normalizeServiceValue(serviceValue)] ?? null;
+}
+
+function resolveServiceBaseUrl(serviceValue = DEFAULT_SERVICE, env = process.env) {
+  return env.ANTHROPIC_BASE_URL?.trim() || getServiceConfig(serviceValue)?.baseUrl || BASE_URL;
+}
+
+function validateTokenFormat(apiKey) {
+  const token = apiKey?.trim() ?? '';
+
+  if (!token) {
+    return {valid: false, reason: 'missing', message: 'Token is required.'};
+  }
+
+  if (token.length < 20) {
+    return {valid: false, reason: 'too_short', message: 'Token seems invalid (too short).'};
+  }
+
+  return {valid: true};
 }
 
 function getServiceLabel(serviceValue = DEFAULT_SERVICE) {
@@ -652,6 +671,8 @@ export {
   getStrategyChoices,
   hasVerifiedModelIds,
   listStrategies,
+  resolveServiceBaseUrl,
   storeToken,
   validateToken,
+  validateTokenFormat,
 };

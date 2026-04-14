@@ -43,8 +43,10 @@ import {
     getStrategyChoices,
     hasVerifiedModelIds,
     listStrategies,
+    resolveServiceBaseUrl,
     storeToken,
-    validateToken
+    validateToken,
+    validateTokenFormat
 } from './src/routerlab.js';
 import { startProxyServer } from './src/proxy.js';
 
@@ -301,6 +303,8 @@ function installClaudeCode() {
 }
 
 async function promptAndValidateToken(promptMessage, serviceConfig) {
+    const serviceBaseUrl = resolveServiceBaseUrl(serviceConfig.value);
+
     while (true) {
         if (serviceConfig.tokenHelpUrl) {
             console.log(chalk.blueBright(`To retrieve your token, visit: ${serviceConfig.tokenHelpUrl}`));
@@ -313,8 +317,14 @@ async function promptAndValidateToken(promptMessage, serviceConfig) {
             mask: '*'
         });
 
+        const formatValidation = validateTokenFormat(token);
+        if (!formatValidation.valid) {
+            console.log(chalk.red(`❌ ${formatValidation.message} Try again.`));
+            continue;
+        }
+
         console.log(chalk.gray("Validating token..."));
-        const validation = await validateToken(token, { baseUrl: serviceConfig.baseUrl });
+        const validation = await validateToken(token, { baseUrl: serviceBaseUrl, serviceValue: serviceConfig.value });
         if (canProceedWithValidation(validation)) {
             console.log(chalk.green("✓ Token validated."));
             return { token, validation };
@@ -347,9 +357,27 @@ async function maybeStoreToken(token, serviceConfig, replaceExisting = false) {
 
 async function resolveLaunchToken(noPrompt, serviceConfig) {
     const candidate = getAvailableTokenCandidate(serviceConfig.value);
+    const serviceBaseUrl = resolveServiceBaseUrl(serviceConfig.value);
 
     if (candidate.token) {
-        const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
+        const formatValidation = validateTokenFormat(candidate.token);
+        if (!formatValidation.valid) {
+            const sourceLabel = formatTokenSource(candidate.source);
+            if (noPrompt) {
+                throw new Error(`${sourceLabel} token is invalid: ${formatValidation.message}`);
+            }
+
+            console.log(chalk.yellow(`⚠ The ${sourceLabel} token is invalid: ${formatValidation.message} Please enter a new token.`));
+            const prompted = await promptAndValidateToken(`Please enter your ${serviceConfig.tokenPromptLabel} token:`, serviceConfig);
+            await maybeStoreToken(prompted.token, serviceConfig, candidate.source === 'secure-store');
+            return {
+                token: prompted.token,
+                source: 'manual',
+                validation: prompted.validation
+            };
+        }
+
+        const validation = await validateToken(candidate.token, { baseUrl: serviceBaseUrl, serviceValue: serviceConfig.value });
         if (canProceedWithValidation(validation)) {
             return {
                 token: candidate.token,
@@ -500,7 +528,10 @@ async function runAuthCommand(action, serviceConfig) {
             return;
         }
 
-        const validation = await validateToken(candidate.token, { baseUrl: serviceConfig.baseUrl });
+        const validation = await validateToken(candidate.token, {
+            baseUrl: resolveServiceBaseUrl(serviceConfig.value),
+            serviceValue: serviceConfig.value
+        });
         console.log(canProceedWithValidation(validation)
             ? chalk.green(`✓ ${formatTokenSource(candidate.source)} token is valid.`)
             : chalk.red(`❌ ${formatTokenSource(candidate.source)} token is invalid: ${validation.message || validation.status || validation.reason}`));
@@ -667,7 +698,7 @@ async function main() {
     }
 
     const modelChoice = await resolveStrategyChoice(parsed, validation.models, serviceConfig);
-    let finalBaseUrl = serviceConfig.baseUrl;
+    let finalBaseUrl = resolveServiceBaseUrl(serviceConfig.value);
     let proxyServer = null;
 
     if (modelChoice !== 'default') {
@@ -676,7 +707,7 @@ async function main() {
         }
 
         const proxyInfo = await startProxyServer(modelChoice, token, {
-            baseUrl: serviceConfig.baseUrl,
+            baseUrl: resolveServiceBaseUrl(serviceConfig.value),
             debug: isDebug,
             onDebug: (message) => console.log(chalk.yellow(message)),
             onError: (message) => console.error(chalk.red(message))
@@ -760,5 +791,6 @@ export {
     installClaudeCode,
     main,
     normalizeEntrypointPath,
+    resolveLaunchToken,
     validateToken
 };
