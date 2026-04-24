@@ -54,7 +54,7 @@ npx claude-scionos auth login
 npx claude-scionos auth login --service llm
 npx claude-scionos auth test
 npx claude-scionos --strategy aws
-npx claude-scionos --service llm --strategy claude-glm-5
+npx claude-scionos --service llm --strategy claude-gpt
 npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 ```
 
@@ -64,8 +64,8 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `--service llm` bascule le lanceur vers `https://llm.routerlab.ch`
 - `llm` est prévu pour un accès sur invitation
 - les tokens enregistrés avec `auth login --service llm` sont stockés séparément du token RouterLab par défaut
-- `llm` expose pour l'instant `claude-glm-5`, `claude-gpt-5.4` et `claude-qwen3.6-plus`
-- `routerlab` expose aussi `claude-gpt-5.4`
+- `llm` expose pour l'instant `claude-gpt`, `claude-qwen3.6-plus`, `claude-minimax-m2.7` et `claude-glm-5.1`
+- `routerlab` expose aussi `claude-gpt`
 
 ## Stratégies
 
@@ -73,8 +73,11 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `aws` : remappe les familles de modèles Claude vers les variantes Claude AWS de RouterLab
 - `claude-glm-5` : force toutes les requêtes vers `claude-glm-5`
 - `claude-minimax-m2.5` : force toutes les requêtes vers `claude-minimax-m2.5`
-- `claude-gpt-5.4` : force toutes les requêtes vers `claude-gpt-5.4`
+- `claude-gpt` : mappe les requêtes Claude vers la famille `claude-gpt`
+  `claude-gpt-5.5 ==> claude-opus-4.7`, `claude-gpt-5.4 ==> claude-sonnet-4.6`, `claude-gpt-5.4-mini ==> claude-gpt-5.4-mini`
 - `claude-qwen3.6-plus` : force toutes les requêtes vers `claude-qwen3.6-plus`
+- `claude-minimax-m2.7` : force toutes les requêtes vers `claude-minimax-m2.7`
+- `claude-glm-5.1` : force toutes les requêtes vers `claude-glm-5.1`
 
 Utilise `--list-strategies` pour voir les stratégies disponibles pour le service choisi et leur disponibilité réelle quand un token est disponible.
 

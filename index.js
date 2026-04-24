@@ -118,7 +118,7 @@ function showHelp() {
     console.log(chalk.gray("Examples"));
     console.log(`  ${chalk.cyan("claude-scionos --strategy aws")}`);
     console.log(`  ${chalk.cyan("claude-scionos auth login --service llm")}`);
-    console.log(`  ${chalk.cyan("claude-scionos --service llm --strategy claude-glm-5")}`);
+    console.log(`  ${chalk.cyan("claude-scionos --service llm --strategy claude-gpt")}`);
     console.log(`  ${chalk.cyan('claude-scionos --strategy aws --no-prompt -p "Summarize this repo"')}`);
     console.log(`  ${chalk.cyan("claude-scionos auth test")}`);
     console.log("");
@@ -159,11 +159,15 @@ function getStrategyIndicator(strategyValue, modelIds, serviceValue) {
 }
 
 function getStrategyMenuLabel(strategyValue) {
-    if (strategyValue === 'aws') {
+    const strategy = getServiceStrategies(DEFAULT_SERVICE)
+        .concat(getServiceStrategies('llm'))
+        .find((entry) => entry.value === strategyValue || entry.aliases?.includes(strategyValue));
+
+    if (strategy?.value === 'aws') {
         return '💰 aws 50%';
     }
 
-    return strategyValue;
+    return strategy?.selectionName || strategy?.name || strategyValue;
 }
 
 function normalizeStrategyValue(strategy) {
@@ -427,7 +431,9 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
     };
 
     if (parsed.strategy) {
-        const strategy = getServiceStrategies(serviceConfig.value).find((entry) => entry.value === parsed.strategy);
+        const strategy = getServiceStrategies(serviceConfig.value).find((entry) => (
+            entry.value === parsed.strategy || entry.aliases?.includes(parsed.strategy)
+        ));
         if (!strategy) {
             throw new Error(`Unknown strategy "${parsed.strategy}". Use --list-strategies to inspect the supported values.`);
         }
@@ -442,12 +448,13 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
     const strategyChoices = getStrategyChoices(modelIds, serviceConfig.value).map((choice) => {
         const launchReadiness = assessStrategyLaunch(choice.value, modelIds, serviceConfig.value);
         const disabled = hasVerifiedModelIds(modelIds) && !launchReadiness.ready ? launchReadiness.note : false;
+        const menuLabel = getStrategyMenuLabel(choice.value);
         return {
             ...choice,
             disabled,
-            name: `${getStrategyIndicator(choice.value, modelIds, serviceConfig.value)} ${getStrategyMenuLabel(choice.value)}`,
-            short: getStrategyMenuLabel(choice.value),
-            description: launchReadiness.note
+            name: `${getStrategyIndicator(choice.value, modelIds, serviceConfig.value)} ${menuLabel}`,
+            short: menuLabel,
+            description: choice.description
         };
     });
 
@@ -472,7 +479,7 @@ function showStrategies(modelIds = null, serviceConfig) {
     const strategies = listStrategies(modelIds, serviceConfig.value);
     showSection('Strategies', strategies.map((strategy) => {
         const indicator = getStrategyIndicator(strategy.value, modelIds, serviceConfig.value);
-        return `${indicator} ${chalk.white(getStrategyMenuLabel(strategy.value))} ${chalk.gray(`(${strategy.value})`)}\n    ${strategy.description}`;
+        return `${indicator} ${chalk.white(getStrategyMenuLabel(strategy.value))} ${chalk.gray(`(${strategy.value})`)}\n    ${[strategy.description, strategy.availability.note].filter(Boolean).join(' ')}`;
     }));
 }
 
@@ -694,6 +701,7 @@ async function main() {
         }
 
         const proxyInfo = await startProxyServer(modelChoice, token, {
+            availableModels: validation.models,
             baseUrl: resolveServiceBaseUrl(serviceConfig.value),
             debug: isDebug,
             onDebug: (message) => console.log(chalk.yellow(message)),

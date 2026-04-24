@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-04-24
+
+### Added
+- **LLM Strategy Coverage**: Added `claude-minimax-m2.7` and `claude-glm-5.1` to the invitation-only `llm` service menu.
+
+### Changed
+- **Documentation**: Updated the English and French READMEs to reflect the current `llm` service strategy list.
+- **Versioning**: Bumped the published package metadata to `4.3.0`.
+
+### Fixed
+- **Proxy Routing**: Prefer the best available `claude-gpt` target dynamically when the requested opus or haiku variant is not exposed for the current token.
+- **Proxy Surface**: Restrict the local proxy to authorized `POST /v1/messages` requests and keep the local proxy secret out of upstream forwarding.
+- **Service Base URL Safety**: Stop ambient `ANTHROPIC_BASE_URL` values from overriding the selected RouterLab service unless an explicit override is passed.
+
 ## [4.2.0] - 2026-04-14
 
 ### Added

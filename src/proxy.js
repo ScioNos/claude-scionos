@@ -52,9 +52,42 @@ function buildProxyRequestOptions(url, method, upstreamHeaders, validToken, body
   };
 }
 
-function resolveMappedModel(targetModel, requestedModel = '') {
+function getPreferredClaudeGptModel(requestedModel = '') {
+  if (requestedModel.includes('haiku') || requestedModel.includes('mini')) {
+    return 'claude-gpt-5.4-mini';
+  }
+
+  if (requestedModel.includes('opus')) {
+    return 'claude-gpt-5.5';
+  }
+
+  return 'claude-gpt-5.4';
+}
+
+function resolveMappedModel(targetModel, requestedModel = '', availableModels = []) {
   if (targetModel !== 'aws') {
-    return targetModel;
+    if (targetModel !== 'claude-gpt') {
+      return targetModel;
+    }
+
+    const preferredModel = getPreferredClaudeGptModel(requestedModel);
+    const availableClaudeGptModels = Array.isArray(availableModels)
+      ? availableModels.filter((model) => model.startsWith('claude-gpt-'))
+      : [];
+
+    if (availableClaudeGptModels.length === 0) {
+      return preferredModel;
+    }
+
+    if (availableClaudeGptModels.includes(preferredModel)) {
+      return preferredModel;
+    }
+
+    return (
+      availableClaudeGptModels.find((model) => model === 'claude-gpt-5.4')
+      ?? availableClaudeGptModels[0]
+      ?? preferredModel
+    );
   }
 
   if (requestedModel.includes('haiku')) {
@@ -94,7 +127,7 @@ function isAllowedProxyRoute(req) {
 }
 
 async function handleMessageRequest(req, res, options) {
-  const {baseUrl, debug, onDebug, onError, targetModel, validToken} = options;
+  const {availableModels = [], baseUrl, debug, onDebug, onError, targetModel, validToken} = options;
   const chunks = [];
   const maxSize = 100 * 1024 * 1024;
   let totalSize = 0;
@@ -122,9 +155,13 @@ async function handleMessageRequest(req, res, options) {
       }
 
       if (bodyJson?.model) {
-        const newModel = resolveMappedModel(targetModel, bodyJson.model);
+        const preferredModel = resolveMappedModel(targetModel, bodyJson.model);
+        const newModel = resolveMappedModel(targetModel, bodyJson.model, availableModels);
         if (debug) {
           onDebug(`[Proxy] Swapping model ${bodyJson.model} -> ${newModel}`);
+          if (preferredModel !== newModel) {
+            onDebug(`[Proxy] Fallback applied because ${preferredModel} is not available for this token`);
+          }
         }
 
         bodyJson.model = newModel;
@@ -216,6 +253,7 @@ async function forwardRequest(req, res, options) {
 
 function startProxyServer(targetModel, validToken, options = {}) {
   const {
+    availableModels = [],
     baseUrl = BASE_URL,
     debug = false,
     onDebug = () => {},
@@ -236,6 +274,7 @@ function startProxyServer(targetModel, validToken, options = {}) {
       }
 
       handleMessageRequest(req, res, {
+        availableModels,
         baseUrl,
         debug,
         onDebug,
@@ -261,4 +300,3 @@ export {
   resolveMappedModel,
   startProxyServer,
 };
-

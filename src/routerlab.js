@@ -15,7 +15,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-token',
     secureStorageLabel: 'RouterLab Token',
     secureStorageFileName: 'routerlab-token.secure.txt',
-    strategyValues: ['default', 'aws', 'claude-gpt-5.4', 'claude-glm-5', 'claude-minimax-m2.5'],
+    strategyValues: ['default', 'aws', 'claude-gpt', 'claude-glm-5', 'claude-minimax-m2.5'],
   },
   llm: {
     value: 'llm',
@@ -28,7 +28,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-llm-token',
     secureStorageLabel: 'RouterLab LLM Token',
     secureStorageFileName: 'routerlab-llm-token.secure.txt',
-    strategyValues: ['claude-glm-5', 'claude-gpt-5.4', 'claude-qwen3.6-plus'],
+    strategyValues: ['claude-gpt', 'claude-qwen3.6-plus', 'claude-minimax-m2.7', 'claude-glm-5.1'],
   },
 };
 const DEFAULT_SERVICE = 'routerlab';
@@ -85,11 +85,13 @@ const STRATEGIES = [
     mappedModels: ['claude-minimax-m2.5'],
   },
   {
-    value: 'claude-gpt-5.4',
-    name: 'GPT-5.4',
-    description: 'Forces all requests to claude-gpt-5.4.',
-    selectionDescription: 'Forces all requests to claude-gpt-5.4.',
-    mappedModels: ['claude-gpt-5.4'],
+    value: 'claude-gpt',
+    name: 'claude-gpt',
+    selectionName: 'claude-gpt',
+    description: 'Maps Claude requests to the claude-gpt family. Opus 4.7 => claude-gpt-5.5, Sonnet 4.6 => claude-gpt-5.4, Haiku => claude-gpt-5.4-mini.',
+    selectionDescription: 'Opus 4.7 => claude-gpt-5.5, Sonnet 4.6 => claude-gpt-5.4, Haiku => claude-gpt-5.4-mini.',
+    aliases: ['claude-gpt-5.4'],
+    verificationModels: ['claude-gpt-5.4'],
   },
   {
     value: 'claude-qwen3.6-plus',
@@ -97,6 +99,20 @@ const STRATEGIES = [
     description: 'Forces all requests to claude-qwen3.6-plus.',
     selectionDescription: 'Forces all requests to claude-qwen3.6-plus.',
     mappedModels: ['claude-qwen3.6-plus'],
+  },
+  {
+    value: 'claude-minimax-m2.7',
+    name: 'MiniMax M2.7',
+    description: 'Forces all requests to claude-minimax-m2.7.',
+    selectionDescription: 'Forces all requests to claude-minimax-m2.7.',
+    mappedModels: ['claude-minimax-m2.7'],
+  },
+  {
+    value: 'claude-glm-5.1',
+    name: 'GLM-5.1',
+    description: 'Forces all requests to claude-glm-5.1.',
+    selectionDescription: 'Forces all requests to claude-glm-5.1.',
+    mappedModels: ['claude-glm-5.1'],
   },
 ];
 
@@ -191,7 +207,7 @@ function getServiceConfig(serviceValue = DEFAULT_SERVICE) {
   return SERVICES[normalizeServiceValue(serviceValue)] ?? null;
 }
 
-function resolveServiceBaseUrl(serviceValue = DEFAULT_SERVICE, env = process.env) {
+function resolveServiceBaseUrl(serviceValue = DEFAULT_SERVICE, env = {}) {
   return env.ANTHROPIC_BASE_URL?.trim() || getServiceConfig(serviceValue)?.baseUrl || BASE_URL;
 }
 
@@ -245,12 +261,19 @@ function getServiceStrategies(serviceValue = DEFAULT_SERVICE) {
     .filter(Boolean);
 }
 
+function normalizeStrategyValue(strategyValue) {
+  return strategyValue === 'claude-gpt-5.4' ? 'claude-gpt' : strategyValue;
+}
+
 function findStrategy(strategyValue, serviceValue = DEFAULT_SERVICE) {
-  return getServiceStrategies(serviceValue).find((strategy) => strategy.value === strategyValue) ?? null;
+  const normalizedValue = normalizeStrategyValue(strategyValue);
+  return getServiceStrategies(serviceValue).find((strategy) => (
+    strategy.value === normalizedValue || strategy.aliases?.includes(strategyValue)
+  )) ?? null;
 }
 
 function getRequiredModels(strategy) {
-  return strategy?.requiredModels ?? strategy?.mappedModels ?? [];
+  return strategy?.requiredModels ?? strategy?.verificationModels ?? strategy?.mappedModels ?? [];
 }
 
 function hasVerifiedModelIds(modelIds) {
@@ -391,17 +414,18 @@ function assessStrategyLaunch(strategyValue, modelIds = [], serviceValue = DEFAU
 }
 
 function getFallbackStrategy(strategyValue, modelIds = [], serviceValue = DEFAULT_SERVICE) {
+  const normalizedValue = normalizeStrategyValue(strategyValue);
   if (hasExploitableModelIds(modelIds, serviceValue)) {
-    return assessStrategyLaunch(strategyValue, modelIds, serviceValue).ready ? strategyValue : null;
+    return assessStrategyLaunch(normalizedValue, modelIds, serviceValue).ready ? normalizedValue : null;
   }
 
-  const availability = assessStrategy(strategyValue, modelIds, serviceValue);
-  return availability.level === 'unavailable' ? null : strategyValue;
+  const availability = assessStrategy(normalizedValue, modelIds, serviceValue);
+  return availability.level === 'unavailable' ? null : normalizedValue;
 }
 
 function getStrategyChoices(modelIds = [], serviceValue = DEFAULT_SERVICE) {
   return listStrategies(modelIds, serviceValue).map((strategy) => ({
-    name: strategy.value,
+    name: strategy.selectionName ?? strategy.name ?? strategy.value,
     value: strategy.value,
     description: strategy.selectionDescription ?? strategy.description,
   }));

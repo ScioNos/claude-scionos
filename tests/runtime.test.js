@@ -53,6 +53,19 @@ describe('proxy request handling', () => {
     expect(resolveMappedModel('aws', 'claude-3-7-sonnet')).toBe('aws-claude-sonnet-4-6');
     expect(resolveMappedModel('claude-glm-5', 'claude-3-7-sonnet')).toBe('claude-glm-5');
   });
+
+  it('maps claude-gpt dynamically from the requested Claude model', () => {
+    expect(resolveMappedModel('claude-gpt', 'claude-3-5-haiku')).toBe('claude-gpt-5.4-mini');
+    expect(resolveMappedModel('claude-gpt', 'claude-3-opus')).toBe('claude-gpt-5.5');
+    expect(resolveMappedModel('claude-gpt', 'claude-3-7-sonnet')).toBe('claude-gpt-5.4');
+  });
+
+  it('falls back to an available claude-gpt model when opus or haiku variants are unavailable', () => {
+    const availableModels = ['claude-gpt-5.4'];
+
+    expect(resolveMappedModel('claude-gpt', 'claude-3-opus', availableModels)).toBe('claude-gpt-5.4');
+    expect(resolveMappedModel('claude-gpt', 'claude-3-5-haiku', availableModels)).toBe('claude-gpt-5.4');
+  });
 });
 
 describe('strategy metadata', () => {
@@ -73,22 +86,27 @@ describe('strategy metadata', () => {
   });
 
   it('renders service-specific availability notes', () => {
-    expect(assessStrategy('claude-glm-5', ['claude-glm-5'], 'llm').note).toContain('RouterLab LLM');
+    expect(assessStrategy('claude-gpt', ['claude-gpt-5.4'], 'llm').note).toContain('RouterLab LLM');
   });
 
   it('treats an empty verified model list as unknown instead of blocked', () => {
-    expect(assessStrategy('claude-gpt-5.4', []).level).toBe('unknown');
-    expect(assessStrategyLaunch('claude-gpt-5.4', []).ready).toBe(true);
-    expect(getFallbackStrategy('claude-gpt-5.4', [])).toBe('claude-gpt-5.4');
+    expect(assessStrategy('claude-gpt', []).level).toBe('unknown');
+    expect(assessStrategyLaunch('claude-gpt', []).ready).toBe(true);
+    expect(getFallbackStrategy('claude-gpt', [])).toBe('claude-gpt');
   });
 
   it('treats non-exploitable llm model lists as unverified instead of blocked', () => {
     const unrelatedModels = ['claude-sonnet-4-6', 'claude-opus-4-6'];
 
     expect(hasExploitableModelIds(unrelatedModels, 'llm')).toBe(false);
-    expect(assessStrategy('claude-gpt-5.4', unrelatedModels, 'llm').level).toBe('unknown');
-    expect(assessStrategyLaunch('claude-gpt-5.4', unrelatedModels, 'llm').ready).toBe(true);
-    expect(getFallbackStrategy('claude-gpt-5.4', unrelatedModels, 'llm')).toBe('claude-gpt-5.4');
+    expect(assessStrategy('claude-gpt', unrelatedModels, 'llm').level).toBe('unknown');
+    expect(assessStrategyLaunch('claude-gpt', unrelatedModels, 'llm').ready).toBe(true);
+    expect(getFallbackStrategy('claude-gpt', unrelatedModels, 'llm')).toBe('claude-gpt');
+  });
+
+  it('supports the legacy claude-gpt-5.4 alias but returns the canonical strategy id', () => {
+    expect(assessStrategyLaunch('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm').ready).toBe(true);
+    expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt');
   });
 
   it('blocks default and aws when one of the required launch models is missing', () => {
@@ -101,11 +119,11 @@ describe('strategy metadata', () => {
     expect(awsReadiness.missingModels).toEqual(['aws-claude-opus-4-6']);
   });
 
-  it('uses raw strategy ids in the interactive selector without availability badges', () => {
+  it('uses human-readable strategy labels in the interactive selector without availability badges', () => {
     const choices = getStrategyChoices(['claude-glm-5']);
 
     expect(choices.find((choice) => choice.value === 'claude-glm-5')).toEqual({
-      name: 'claude-glm-5',
+      name: 'GLM-5',
       value: 'claude-glm-5',
       description: 'Forces all requests to claude-glm-5.',
     });
@@ -113,31 +131,37 @@ describe('strategy metadata', () => {
   });
 
   it('shows a service-specific menu for llm', () => {
-    const llmChoices = getStrategyChoices(['claude-glm-5', 'claude-gpt-5.4', 'claude-qwen3.6-plus'], 'llm');
-
-    expect(llmChoices.map((choice) => choice.value)).toEqual([
-      'claude-glm-5',
+    const llmChoices = getStrategyChoices([
       'claude-gpt-5.4',
       'claude-qwen3.6-plus',
+      'claude-minimax-m2.7',
+      'claude-glm-5.1',
+    ], 'llm');
+
+    expect(llmChoices.map((choice) => choice.value)).toEqual([
+      'claude-gpt',
+      'claude-qwen3.6-plus',
+      'claude-minimax-m2.7',
+      'claude-glm-5.1',
     ]);
   });
 
-  it('keeps claude-gpt-5.4 as the third routerlab option', () => {
+  it('keeps claude-gpt as the third routerlab option', () => {
     const routerlabChoices = getStrategyChoices(['claude-gpt-5.4'], 'routerlab');
 
     expect(routerlabChoices.map((choice) => choice.value)).toEqual([
       'default',
       'aws',
-      'claude-gpt-5.4',
+      'claude-gpt',
       'claude-glm-5',
       'claude-minimax-m2.5',
     ]);
   });
 
-  it('keeps claude-gpt-5.4 available on routerlab too', () => {
+  it('keeps claude-gpt available on routerlab too', () => {
     const routerlabChoices = getStrategyChoices(['claude-gpt-5.4'], 'routerlab');
 
-    expect(routerlabChoices.map((choice) => choice.value)).toContain('claude-gpt-5.4');
+    expect(routerlabChoices.map((choice) => choice.value)).toContain('claude-gpt');
   });
 
   it('falls back to default only when a strategy is unavailable', () => {
@@ -149,8 +173,8 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('aws', DEFAULT_CLAUDE_MODELS)).toBe(null);
     expect(getFallbackStrategy('aws', AWS_CLAUDE_MODELS)).toBe('aws');
     expect(getFallbackStrategy('aws', null)).toBe('aws');
-    expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt-5.4');
-    expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt-5.4');
+    expect(getFallbackStrategy('claude-gpt', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt');
+    expect(getFallbackStrategy('claude-gpt', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt');
     expect(getFallbackStrategy('claude-qwen3.6-plus', ['claude-qwen3.6-plus'], 'llm')).toBe('claude-qwen3.6-plus');
   });
 });
@@ -185,6 +209,12 @@ describe('wrapper validation helpers', () => {
     expect(resolveServiceBaseUrl('routerlab', {})).toBe('https://routerlab.ch');
     expect(resolveServiceBaseUrl('llm', {})).toBe('https://llm.routerlab.ch');
     expect(resolveServiceBaseUrl('routerlab', {ANTHROPIC_BASE_URL: 'https://override.example'})).toBe('https://override.example');
+  });
+
+  it('does not let an ambient ANTHROPIC_BASE_URL override the selected service by default', () => {
+    vi.stubEnv('ANTHROPIC_BASE_URL', 'https://override.example');
+
+    expect(resolveServiceBaseUrl('llm')).toBe('https://llm.routerlab.ch');
   });
 
   it('fails fast in no-prompt mode when the token format is obviously invalid', async () => {
