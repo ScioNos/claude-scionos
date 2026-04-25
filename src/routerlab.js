@@ -15,7 +15,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-token',
     secureStorageLabel: 'RouterLab Token',
     secureStorageFileName: 'routerlab-token.secure.txt',
-    strategyValues: ['default', 'aws', 'claude-gpt', 'claude-glm-5', 'claude-minimax-m2.5'],
+    strategyValues: ['default', 'aws', 'claude-gpt', 'claude-minimax-m2.7', 'claude-glm-5.1'],
   },
   llm: {
     value: 'llm',
@@ -55,17 +55,17 @@ const AWS_CLAUDE_MODELS = [
 const STRATEGIES = [
   {
     value: 'default',
-    name: 'Default',
+    name: 'Claude Native',
     description: 'Uses Claude natively without a local proxy.',
-    selectionName: 'Default (Use Claude natively)',
+    selectionName: 'Claude Native (Opus 4.7)',
     selectionDescription: 'Standard behavior. Claude decides which model to use.',
     requiredModels: DEFAULT_CLAUDE_MODELS,
   },
   {
     value: 'aws',
-    name: 'Claude AWS',
+    name: 'Claude via AWS',
     description: 'Maps Claude requests to AWS-backed Claude variants.',
-    selectionName: 'Claude AWS (-50% du prix 💰)',
+    selectionName: 'Claude via AWS (Opus 4.6, -50%)',
     selectionDescription: 'Map models to aws-claude-haiku, aws-claude-sonnet, aws-claude-opus.',
     requiredModels: AWS_CLAUDE_MODELS,
     mappedModels: AWS_CLAUDE_MODELS,
@@ -86,8 +86,8 @@ const STRATEGIES = [
   },
   {
     value: 'claude-gpt',
-    name: 'claude-gpt',
-    selectionName: 'claude-gpt',
+    name: 'OpenAI GPT',
+    selectionName: 'OpenAI GPT (5.5, 5.4, 5.4-mini)',
     description: 'Maps Claude requests to the claude-gpt family. Opus 4.7 => claude-gpt-5.5, Sonnet 4.6 => claude-gpt-5.4, Haiku => claude-gpt-5.4-mini.',
     selectionDescription: 'Opus 4.7 => claude-gpt-5.5, Sonnet 4.6 => claude-gpt-5.4, Haiku => claude-gpt-5.4-mini.',
     aliases: ['claude-gpt-5.4'],

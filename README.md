@@ -65,14 +65,12 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `llm` is intended for invitation-only access
 - Tokens stored with `auth login --service llm` are kept separate from the default RouterLab token
 - `llm` currently exposes `claude-gpt`, `claude-qwen3.6-plus`, `claude-minimax-m2.7`, and `claude-glm-5.1`
-- `routerlab` also exposes `claude-gpt`
+- `routerlab` also exposes `claude-gpt`, `claude-minimax-m2.7`, and `claude-glm-5.1`
 
 ## Strategies
 
 - `default`: use Claude Code normally without the local proxy
 - `aws`: remap Claude model families to RouterLab AWS-backed Claude variants
-- `claude-glm-5`: force all requests to `claude-glm-5`
-- `claude-minimax-m2.5`: force all requests to `claude-minimax-m2.5`
 - `claude-gpt`: map Claude requests to the `claude-gpt` family
   `claude-gpt-5.5 ==> claude-opus-4.7`, `claude-gpt-5.4 ==> claude-sonnet-4.6`, `claude-gpt-5.4-mini ==> claude-gpt-5.4-mini`
 - `claude-qwen3.6-plus`: force all requests to `claude-qwen3.6-plus`

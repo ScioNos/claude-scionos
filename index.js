@@ -462,9 +462,12 @@ async function resolveStrategyChoice(parsed, modelIds, serviceConfig) {
         throw new Error(`No launchable strategy is available on ${serviceConfig.availabilityLabel}.`);
     }
 
-    const spacedStrategyChoices = strategyChoices.flatMap((choice, index) => (
-        index === strategyChoices.length - 1 ? [choice] : [choice, new Separator(' ')]
-    ));
+    const spacedStrategyChoices = [
+        new Separator(' '),
+        ...strategyChoices.flatMap((choice, index) => (
+            index === strategyChoices.length - 1 ? [choice] : [choice, new Separator(' ')]
+        ))
+    ];
 
     const selected = await select({
         message: 'Select Model Strategy:',

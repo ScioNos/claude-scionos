@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.1] - 2026-04-25
+
+### Changed
+- **RouterLab Strategy Menu**: Replaced the default `routerlab` service entries `claude-glm-5` and `claude-minimax-m2.5` with `claude-minimax-m2.7` and `claude-glm-5.1` to match the current RouterLab lineup.
+- **Interactive Labels**: Harmonized the strategy selector labels to `Claude Native (Opus 4.7)`, `Claude via AWS (Opus 4.6, -50%)`, and `OpenAI GPT (5.5, 5.4, 5.4-mini)`.
+- **Menu Layout**: Added a blank line before the first interactive strategy choice for better readability.
+- **Documentation**: Updated the English and French READMEs to reflect the current RouterLab strategy menu.
+
 ## [4.3.0] - 2026-04-24
 
 ### Added

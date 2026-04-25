@@ -51,7 +51,7 @@ describe('proxy request handling', () => {
     expect(resolveMappedModel('aws', 'claude-3-5-haiku')).toBe('aws-claude-haiku-4-5-20251001');
     expect(resolveMappedModel('aws', 'claude-3-opus')).toBe('aws-claude-opus-4-6');
     expect(resolveMappedModel('aws', 'claude-3-7-sonnet')).toBe('aws-claude-sonnet-4-6');
-    expect(resolveMappedModel('claude-glm-5', 'claude-3-7-sonnet')).toBe('claude-glm-5');
+    expect(resolveMappedModel('claude-glm-5.1', 'claude-3-7-sonnet')).toBe('claude-glm-5.1');
   });
 
   it('maps claude-gpt dynamically from the requested Claude model', () => {
@@ -76,7 +76,7 @@ describe('strategy metadata', () => {
 
   it('marks default and mapped strategies as ready only when all required models are available', () => {
     expect(assessStrategy('default', DEFAULT_CLAUDE_MODELS).level).toBe('ready');
-    expect(assessStrategy('claude-glm-5', ['claude-glm-5']).level).toBe('ready');
+    expect(assessStrategy('claude-glm-5.1', ['claude-glm-5.1']).level).toBe('ready');
     expect(assessStrategy('aws', AWS_CLAUDE_MODELS).level).toBe('ready');
   });
 
@@ -120,12 +120,12 @@ describe('strategy metadata', () => {
   });
 
   it('uses human-readable strategy labels in the interactive selector without availability badges', () => {
-    const choices = getStrategyChoices(['claude-glm-5']);
+    const choices = getStrategyChoices(['claude-glm-5.1']);
 
-    expect(choices.find((choice) => choice.value === 'claude-glm-5')).toEqual({
-      name: 'GLM-5',
-      value: 'claude-glm-5',
-      description: 'Forces all requests to claude-glm-5.',
+    expect(choices.find((choice) => choice.value === 'claude-glm-5.1')).toEqual({
+      name: 'GLM-5.1',
+      value: 'claude-glm-5.1',
+      description: 'Forces all requests to claude-glm-5.1.',
     });
     expect(choices.every((choice) => !choice.name.includes('[Ready]'))).toBe(true);
   });
@@ -153,8 +153,8 @@ describe('strategy metadata', () => {
       'default',
       'aws',
       'claude-gpt',
-      'claude-glm-5',
-      'claude-minimax-m2.5',
+      'claude-minimax-m2.7',
+      'claude-glm-5.1',
     ]);
   });
 
@@ -165,8 +165,8 @@ describe('strategy metadata', () => {
   });
 
   it('falls back to default only when a strategy is unavailable', () => {
-    expect(getFallbackStrategy('claude-glm-5', ['claude-glm-5'])).toBe('claude-glm-5');
-    expect(getFallbackStrategy('claude-glm-5', ['claude-minimax-m2.5'])).toBe(null);
+    expect(getFallbackStrategy('claude-glm-5.1', ['claude-glm-5.1'])).toBe('claude-glm-5.1');
+    expect(getFallbackStrategy('claude-glm-5.1', ['claude-minimax-m2.7'])).toBe(null);
     expect(getFallbackStrategy('default', DEFAULT_CLAUDE_MODELS.slice(0, 1))).toBe(null);
     expect(getFallbackStrategy('aws', AWS_CLAUDE_MODELS.slice(0, 2))).toBe(null);
     expect(getFallbackStrategy('aws', ['aws-claude-sonnet-4-6'])).toBe(null);
