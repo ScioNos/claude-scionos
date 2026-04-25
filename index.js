@@ -163,10 +163,6 @@ function getStrategyMenuLabel(strategyValue) {
         .concat(getServiceStrategies('llm'))
         .find((entry) => entry.value === strategyValue || entry.aliases?.includes(strategyValue));
 
-    if (strategy?.value === 'aws') {
-        return '💰 aws 50%';
-    }
-
     return strategy?.selectionName || strategy?.name || strategyValue;
 }
 
