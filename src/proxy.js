@@ -64,7 +64,40 @@ function getPreferredClaudeGptModel(requestedModel = '') {
   return 'claude-gpt-5.4';
 }
 
+function getPreferredClaudeModel(requestedModel = '') {
+  if (requestedModel.includes('haiku') || requestedModel.includes('mini')) {
+    return 'claude-haiku-4-5-20251001';
+  }
+
+  if (requestedModel.includes('opus')) {
+    return 'claude-opus-4-6';
+  }
+
+  return 'claude-sonnet-4-6';
+}
+
 function resolveMappedModel(targetModel, requestedModel = '', availableModels = []) {
+  if (targetModel === 'claude') {
+    const preferredModel = getPreferredClaudeModel(requestedModel);
+    const availableClaudeModels = Array.isArray(availableModels)
+      ? availableModels.filter((model) => model.startsWith('claude-') && !model.startsWith('claude-gpt-'))
+      : [];
+
+    if (availableClaudeModels.length === 0) {
+      return preferredModel;
+    }
+
+    if (availableClaudeModels.includes(preferredModel)) {
+      return preferredModel;
+    }
+
+    return (
+      availableClaudeModels.find((model) => model === 'claude-sonnet-4-6')
+      ?? availableClaudeModels[0]
+      ?? preferredModel
+    );
+  }
+
   if (targetModel !== 'aws') {
     if (targetModel !== 'claude-gpt') {
       return targetModel;

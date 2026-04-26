@@ -60,6 +60,20 @@ describe('proxy request handling', () => {
     expect(resolveMappedModel('claude-gpt', 'claude-3-7-sonnet')).toBe('claude-gpt-5.4');
   });
 
+  it('maps llm Claude models dynamically from the requested Claude model', () => {
+    expect(resolveMappedModel('claude', 'claude-3-5-haiku')).toBe('claude-haiku-4-5-20251001');
+    expect(resolveMappedModel('claude', 'claude-3-opus')).toBe('claude-opus-4-6');
+    expect(resolveMappedModel('claude', 'claude-3-7-sonnet')).toBe('claude-sonnet-4-6');
+    expect(resolveMappedModel('claude', 'unknown-model')).toBe('claude-sonnet-4-6');
+  });
+
+  it('falls back to an available Claude model when opus or haiku variants are unavailable', () => {
+    const availableModels = ['claude-sonnet-4-6'];
+
+    expect(resolveMappedModel('claude', 'claude-3-opus', availableModels)).toBe('claude-sonnet-4-6');
+    expect(resolveMappedModel('claude', 'claude-3-5-haiku', availableModels)).toBe('claude-sonnet-4-6');
+  });
+
   it('falls back to an available claude-gpt model when opus or haiku variants are unavailable', () => {
     const availableModels = ['claude-gpt-5.4'];
 
@@ -76,12 +90,14 @@ describe('strategy metadata', () => {
 
   it('marks default and mapped strategies as ready only when all required models are available', () => {
     expect(assessStrategy('default', DEFAULT_CLAUDE_MODELS).level).toBe('ready');
+    expect(assessStrategy('claude', DEFAULT_CLAUDE_MODELS, 'llm').level).toBe('ready');
     expect(assessStrategy('claude-glm-5.1', ['claude-glm-5.1']).level).toBe('ready');
     expect(assessStrategy('aws', AWS_CLAUDE_MODELS).level).toBe('ready');
   });
 
   it('marks grouped strategies as partial when one of the required models is missing', () => {
     expect(assessStrategy('default', DEFAULT_CLAUDE_MODELS.slice(0, 2)).level).toBe('partial');
+    expect(assessStrategy('claude', DEFAULT_CLAUDE_MODELS.slice(0, 2), 'llm').level).toBe('partial');
     expect(assessStrategy('aws', AWS_CLAUDE_MODELS.slice(0, 2)).level).toBe('partial');
   });
 
@@ -95,13 +111,13 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('claude-gpt', [])).toBe('claude-gpt');
   });
 
-  it('treats non-exploitable llm model lists as unverified instead of blocked', () => {
-    const unrelatedModels = ['claude-sonnet-4-6', 'claude-opus-4-6'];
+  it('treats llm strategies as verified when their models are reported', () => {
+    const reportedModels = ['claude-minimax-m2.7', 'claude-glm-5.1'];
 
-    expect(hasExploitableModelIds(unrelatedModels, 'llm')).toBe(false);
-    expect(assessStrategy('claude-gpt', unrelatedModels, 'llm').level).toBe('unknown');
-    expect(assessStrategyLaunch('claude-gpt', unrelatedModels, 'llm').ready).toBe(true);
-    expect(getFallbackStrategy('claude-gpt', unrelatedModels, 'llm')).toBe('claude-gpt');
+    expect(hasExploitableModelIds(reportedModels, 'llm')).toBe(true);
+    expect(assessStrategy('claude-gpt', reportedModels, 'llm').level).toBe('unavailable');
+    expect(assessStrategyLaunch('claude-gpt', reportedModels, 'llm').ready).toBe(false);
+    expect(getFallbackStrategy('claude-gpt', reportedModels, 'llm')).toBe(null);
   });
 
   it('supports the legacy claude-gpt-5.4 alias but returns the canonical strategy id', () => {
@@ -132,6 +148,9 @@ describe('strategy metadata', () => {
 
   it('shows a service-specific menu for llm', () => {
     const llmChoices = getStrategyChoices([
+      'claude-haiku-4-5-20251001',
+      'claude-sonnet-4-6',
+      'claude-opus-4-6',
       'claude-gpt-5.4',
       'claude-qwen3.6-plus',
       'claude-minimax-m2.7',
@@ -139,11 +158,17 @@ describe('strategy metadata', () => {
     ], 'llm');
 
     expect(llmChoices.map((choice) => choice.value)).toEqual([
+      'claude',
       'claude-gpt',
       'claude-qwen3.6-plus',
       'claude-minimax-m2.7',
       'claude-glm-5.1',
     ]);
+    expect(llmChoices.find((choice) => choice.value === 'claude')).toEqual({
+      name: 'Claude (Opus 4.6)',
+      value: 'claude',
+      description: 'Map models to claude-haiku, claude-sonnet, claude-opus.',
+    });
   });
 
   it('keeps claude-gpt as the third routerlab option', () => {
@@ -168,6 +193,10 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('claude-glm-5.1', ['claude-glm-5.1'])).toBe('claude-glm-5.1');
     expect(getFallbackStrategy('claude-glm-5.1', ['claude-minimax-m2.7'])).toBe(null);
     expect(getFallbackStrategy('default', DEFAULT_CLAUDE_MODELS.slice(0, 1))).toBe(null);
+    expect(getFallbackStrategy('claude', DEFAULT_CLAUDE_MODELS.slice(0, 2), 'llm')).toBe(null);
+    expect(getFallbackStrategy('claude', DEFAULT_CLAUDE_MODELS, 'llm')).toBe('claude');
+    expect(getFallbackStrategy('claude', ['claude-sonnet-4-6'], 'llm')).toBe(null);
+    expect(getFallbackStrategy('claude', null, 'llm')).toBe('claude');
     expect(getFallbackStrategy('aws', AWS_CLAUDE_MODELS.slice(0, 2))).toBe(null);
     expect(getFallbackStrategy('aws', ['aws-claude-sonnet-4-6'])).toBe(null);
     expect(getFallbackStrategy('aws', DEFAULT_CLAUDE_MODELS)).toBe(null);

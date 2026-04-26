@@ -28,7 +28,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-llm-token',
     secureStorageLabel: 'RouterLab LLM Token',
     secureStorageFileName: 'routerlab-llm-token.secure.txt',
-    strategyValues: ['claude-gpt', 'claude-qwen3.6-plus', 'claude-minimax-m2.7', 'claude-glm-5.1'],
+    strategyValues: ['claude', 'claude-gpt', 'claude-qwen3.6-plus', 'claude-minimax-m2.7', 'claude-glm-5.1'],
   },
 };
 const DEFAULT_SERVICE = 'routerlab';
@@ -83,6 +83,15 @@ const STRATEGIES = [
     description: 'Forces all requests to claude-minimax-m2.5.',
     selectionDescription: 'Forces all requests to claude-minimax-m2.5.',
     mappedModels: ['claude-minimax-m2.5'],
+  },
+  {
+    value: 'claude',
+    name: 'Claude',
+    description: 'Maps Claude requests to standard Claude variants via a local proxy.',
+    selectionName: 'Claude (Opus 4.6)',
+    selectionDescription: 'Map models to claude-haiku, claude-sonnet, claude-opus.',
+    requiredModels: DEFAULT_CLAUDE_MODELS,
+    mappedModels: DEFAULT_CLAUDE_MODELS,
   },
   {
     value: 'claude-gpt',

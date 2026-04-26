@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.3] - 2026-04-26
+
+### Added
+- **LLM Claude Strategy**: Added a `claude` strategy to the invitation-only `llm` service menu with the interactive label `Claude (Opus 4.6)`.
+
+### Changed
+- **LLM Strategy Menu**: Put the new `claude` strategy first in the `llm` service selector and updated the documentation to reflect the current `llm` lineup.
+- **Versioning**: Bumped the published package metadata to `4.3.3`.
+
+### Fixed
+- **LLM Claude Proxy Mapping**: Remap Claude family requests on `--service llm --strategy claude` to `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, or `claude-opus-4-6`, with fallback to the best available standard Claude target for the current token.
+
 ## [4.3.2] - 2026-04-25
 
 ### Fixed
