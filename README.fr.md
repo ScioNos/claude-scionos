@@ -56,6 +56,8 @@ npx claude-scionos auth test
 npx claude-scionos --strategy aws
 npx claude-scionos --service llm --strategy claude
 npx claude-scionos --service llm --strategy claude-gpt
+npx claude-scionos --service llm --strategy claude-gpt-special
+npx claude-scionos --service llm --strategy deepseek-v4-beta
 npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 ```
 
@@ -65,7 +67,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `--service llm` bascule le lanceur vers `https://llm.routerlab.ch`
 - `llm` est prévu pour un accès sur invitation
 - les tokens enregistrés avec `auth login --service llm` sont stockés séparément du token RouterLab par défaut
-- `llm` expose pour l'instant `claude`, `claude-gpt`, `claude-qwen3.6-plus`, `claude-minimax-m2.7` et `claude-glm-5.1`
+- `llm` expose pour l'instant `claude`, `claude-gpt`, `claude-gpt-special` et `deepseek-v4-beta`
 - `routerlab` expose aussi `claude-gpt`, `claude-minimax-m2.7` et `claude-glm-5.1`
 
 ## Stratégies
@@ -75,6 +77,8 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `claude` : remappe les familles de modèles Claude sur `--service llm` vers les variantes Claude standard `claude-haiku-4-5-20251001`, `claude-sonnet-4-6` et `claude-opus-4-6`
 - `claude-gpt` : mappe les requêtes Claude vers la famille `claude-gpt`
   `claude-gpt-5.5 ==> claude-opus-4.7`, `claude-gpt-5.4 ==> claude-sonnet-4.6`, `claude-gpt-5.4-mini ==> claude-gpt-5.4-mini`
+- `claude-gpt-special` : sur `--service llm`, force toutes les requêtes vers `claude-gpt-5.4-sp`
+- `deepseek-v4-beta` : sur `--service llm`, mappe les requêtes Claude vers `deepseek-v4-pro` pour opus et `deepseek-v4-flash` pour sonnet ou haiku
 - `claude-qwen3.6-plus` : force toutes les requêtes vers `claude-qwen3.6-plus`
 - `claude-minimax-m2.7` : force toutes les requêtes vers `claude-minimax-m2.7`
 - `claude-glm-5.1` : force toutes les requêtes vers `claude-glm-5.1`

@@ -28,7 +28,7 @@ const SERVICES = {
     secureStorageAccount: 'routerlab-llm-token',
     secureStorageLabel: 'RouterLab LLM Token',
     secureStorageFileName: 'routerlab-llm-token.secure.txt',
-    strategyValues: ['claude', 'claude-gpt', 'claude-qwen3.6-plus', 'claude-minimax-m2.7', 'claude-glm-5.1'],
+    strategyValues: ['claude', 'claude-gpt', 'claude-gpt-special', 'deepseek-v4-beta'],
   },
 };
 const DEFAULT_SERVICE = 'routerlab';
@@ -101,6 +101,22 @@ const STRATEGIES = [
     selectionDescription: 'Opus 4.7 => claude-gpt-5.5, Sonnet 4.6 => claude-gpt-5.4, Haiku => claude-gpt-5.4-mini.',
     aliases: ['claude-gpt-5.4'],
     verificationModels: ['claude-gpt-5.4'],
+  },
+  {
+    value: 'claude-gpt-special',
+    name: 'OpenAI GPT special',
+    selectionName: 'OpenAI GPT special (only gpt-5.4)',
+    description: 'Forces all requests to claude-gpt-5.4-sp.',
+    selectionDescription: 'Forces all requests to claude-gpt-5.4-sp.',
+    mappedModels: ['claude-gpt-5.4-sp'],
+  },
+  {
+    value: 'deepseek-v4-beta',
+    name: 'deepseek-v4 beta',
+    selectionName: 'deepseek-v4 beta',
+    description: 'Maps Claude requests to the deepseek-v4 family. Opus 4.7 => deepseek-v4-pro, Sonnet 4.6 => deepseek-v4-flash, Haiku => deepseek-v4-flash.',
+    selectionDescription: 'Opus 4.7 => deepseek-v4-pro, Sonnet 4.6 => deepseek-v4-flash, Haiku => deepseek-v4-flash.',
+    verificationModels: ['deepseek-v4-pro', 'deepseek-v4-flash'],
   },
   {
     value: 'claude-qwen3.6-plus',
@@ -271,7 +287,15 @@ function getServiceStrategies(serviceValue = DEFAULT_SERVICE) {
 }
 
 function normalizeStrategyValue(strategyValue) {
-  return strategyValue === 'claude-gpt-5.4' ? 'claude-gpt' : strategyValue;
+  if (strategyValue === 'claude-gpt-5.4') {
+    return 'claude-gpt';
+  }
+
+  if (strategyValue === 'claude-gpt-5.4-sp') {
+    return 'claude-gpt-special';
+  }
+
+  return strategyValue;
 }
 
 function findStrategy(strategyValue, serviceValue = DEFAULT_SERVICE) {
@@ -671,6 +695,15 @@ function deleteStoredToken(serviceValue = DEFAULT_SERVICE) {
 
 function getStoredTokenStatus(serviceValue = DEFAULT_SERVICE) {
   const storage = getSecureStorageBackend();
+
+  if (process.platform === 'win32') {
+    const tokenFile = getWindowsTokenFile(serviceValue);
+    return {
+      ...storage,
+      stored: fs.existsSync(tokenFile) && hasNonEmptyWindowsTokenFile(tokenFile),
+    };
+  }
+
   const storedToken = getStoredToken(serviceValue);
   return {
     ...storage,

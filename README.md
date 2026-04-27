@@ -56,6 +56,8 @@ npx claude-scionos auth test
 npx claude-scionos --strategy aws
 npx claude-scionos --service llm --strategy claude
 npx claude-scionos --service llm --strategy claude-gpt
+npx claude-scionos --service llm --strategy claude-gpt-special
+npx claude-scionos --service llm --strategy deepseek-v4-beta
 npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 ```
 
@@ -65,7 +67,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `--service llm` switches the launcher to `https://llm.routerlab.ch`
 - `llm` is intended for invitation-only access
 - Tokens stored with `auth login --service llm` are kept separate from the default RouterLab token
-- `llm` currently exposes `claude`, `claude-gpt`, `claude-qwen3.6-plus`, `claude-minimax-m2.7`, and `claude-glm-5.1`
+- `llm` currently exposes `claude`, `claude-gpt`, `claude-gpt-special`, and `deepseek-v4-beta`
 - `routerlab` also exposes `claude-gpt`, `claude-minimax-m2.7`, and `claude-glm-5.1`
 
 ## Strategies
@@ -75,6 +77,8 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `claude`: remap Claude model families on `--service llm` to the standard Claude variants `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, and `claude-opus-4-6`
 - `claude-gpt`: map Claude requests to the `claude-gpt` family
   `claude-gpt-5.5 ==> claude-opus-4.7`, `claude-gpt-5.4 ==> claude-sonnet-4.6`, `claude-gpt-5.4-mini ==> claude-gpt-5.4-mini`
+- `claude-gpt-special`: on `--service llm`, force all requests to `claude-gpt-5.4-sp`
+- `deepseek-v4-beta`: on `--service llm`, map Claude requests to `deepseek-v4-pro` for opus and `deepseek-v4-flash` for sonnet or haiku
 - `claude-qwen3.6-plus`: force all requests to `claude-qwen3.6-plus`
 - `claude-minimax-m2.7`: force all requests to `claude-minimax-m2.7`
 - `claude-glm-5.1`: force all requests to `claude-glm-5.1`

@@ -45,9 +45,10 @@ describe('secure Windows token storage', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.statSync).mockReturnValue({size: 0});
 
-    const {getStoredToken} = await import('../src/routerlab.js');
+    const {getStoredToken, getStoredTokenStatus} = await import('../src/routerlab.js');
 
     expect(getStoredToken()).toBeNull();
+    expect(getStoredTokenStatus().stored).toBe(false);
     expect(spawnSync).not.toHaveBeenCalled();
   });
 
@@ -59,6 +60,16 @@ describe('secure Windows token storage', () => {
     const {storeToken} = await import('../src/routerlab.js');
 
     expect(() => storeToken('dummy-token')).toThrow('Secure token file was created but no encrypted content was written');
+  });
+
+  it('checks Windows stored token status without decrypting it', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({size: 18});
+
+    const {getStoredTokenStatus} = await import('../src/routerlab.js');
+
+    expect(getStoredTokenStatus().stored).toBe(true);
+    expect(spawnSync).not.toHaveBeenCalled();
   });
 
   it('reads the Windows token file in Node before decrypting it in PowerShell', async () => {

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.4] - 2026-04-27
+
+### Added
+- **LLM Strategy Coverage**: Added `claude-gpt-special` for the fixed `claude-gpt-5.4-sp` route and `deepseek-v4-beta` for dynamic `deepseek-v4-pro` / `deepseek-v4-flash` routing on the invitation-only `llm` service.
+
+### Changed
+- **LLM Strategy Menu**: Reduced the `llm` service selector to `claude`, `claude-gpt`, `claude-gpt-special`, and `deepseek-v4-beta` while keeping the default `routerlab` service lineup unchanged.
+- **Versioning**: Bumped the published package metadata to `4.3.4`.
+
+### Fixed
+- **Windows Doctor**: Avoid secure-store token decryption during `doctor` on Windows so diagnostics no longer crash after reporting stored LLM token status.
+- **LLM Menu Availability**: Keep the single-model `claude-gpt-special` launch path selectable when RouterLab LLM reports `claude-gpt-5.4-sp`.
+
 ## [4.3.3] - 2026-04-26
 
 ### Added

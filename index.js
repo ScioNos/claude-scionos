@@ -562,11 +562,16 @@ async function runDoctor(serviceConfig) {
     showStatus('Env token', getEnvironmentToken() ? 'ok' : 'warn', getEnvironmentToken() ? 'available' : 'not set');
     console.log('');
 
-    const candidate = getAvailableTokenCandidate(serviceConfig.value);
+    const envToken = getEnvironmentToken();
+    const candidate = envToken
+        ? { token: envToken, source: 'environment' }
+        : { token: null, source: storedStatus.stored ? 'secure-store' : 'none' };
     let validation = null;
 
     if (!candidate.token) {
-        showStatus(`${serviceConfig.tokenPromptLabel} auth`, 'warn', 'Skipped: no environment or stored token available');
+        showStatus(`${serviceConfig.tokenPromptLabel} auth`, 'warn', storedStatus.stored
+            ? 'Skipped: stored token available but not validated during doctor on Windows'
+            : 'Skipped: no environment or stored token available');
     } else {
         validation = await validateToken(candidate.token, {
             baseUrl: resolveServiceBaseUrl(serviceConfig.value),

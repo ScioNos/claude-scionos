@@ -76,6 +76,14 @@ function getPreferredClaudeModel(requestedModel = '') {
   return 'claude-sonnet-4-6';
 }
 
+function getPreferredDeepseekV4Model(requestedModel = '') {
+  if (requestedModel.includes('opus')) {
+    return 'deepseek-v4-pro';
+  }
+
+  return 'deepseek-v4-flash';
+}
+
 function resolveMappedModel(targetModel, requestedModel = '', availableModels = []) {
   if (targetModel === 'claude') {
     const preferredModel = getPreferredClaudeModel(requestedModel);
@@ -94,6 +102,31 @@ function resolveMappedModel(targetModel, requestedModel = '', availableModels = 
     return (
       availableClaudeModels.find((model) => model === 'claude-sonnet-4-6')
       ?? availableClaudeModels[0]
+      ?? preferredModel
+    );
+  }
+
+  if (targetModel === 'claude-gpt-special') {
+    return 'claude-gpt-5.4-sp';
+  }
+
+  if (targetModel === 'deepseek-v4-beta') {
+    const preferredModel = getPreferredDeepseekV4Model(requestedModel);
+    const availableDeepseekModels = Array.isArray(availableModels)
+      ? availableModels.filter((model) => model === 'deepseek-v4-pro' || model === 'deepseek-v4-flash')
+      : [];
+
+    if (availableDeepseekModels.length === 0) {
+      return preferredModel;
+    }
+
+    if (availableDeepseekModels.includes(preferredModel)) {
+      return preferredModel;
+    }
+
+    return (
+      availableDeepseekModels.find((model) => model === 'deepseek-v4-flash')
+      ?? availableDeepseekModels[0]
       ?? preferredModel
     );
   }

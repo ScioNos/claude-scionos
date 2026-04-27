@@ -1,6 +1,6 @@
 {
     "name": "claude-scionos",
-    "version": "4.3.3",
+    "version": "4.3.4",
     "description": "RouterLab launcher, strategy proxy and secure token wrapper for Claude Code CLI",
     "type": "module",
     "main": "index.js",

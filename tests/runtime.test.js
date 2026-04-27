@@ -60,6 +60,24 @@ describe('proxy request handling', () => {
     expect(resolveMappedModel('claude-gpt', 'claude-3-7-sonnet')).toBe('claude-gpt-5.4');
   });
 
+  it('maps the special llm GPT strategy to claude-gpt-5.4-sp', () => {
+    expect(resolveMappedModel('claude-gpt-special', 'claude-3-5-haiku')).toBe('claude-gpt-5.4-sp');
+    expect(resolveMappedModel('claude-gpt-special', 'claude-3-opus')).toBe('claude-gpt-5.4-sp');
+    expect(resolveMappedModel('claude-gpt-special', 'claude-3-7-sonnet')).toBe('claude-gpt-5.4-sp');
+  });
+
+  it('maps deepseek-v4 beta from the requested Claude model', () => {
+    expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-5-haiku')).toBe('deepseek-v4-flash');
+    expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-opus')).toBe('deepseek-v4-pro');
+    expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-7-sonnet')).toBe('deepseek-v4-flash');
+  });
+
+  it('falls back to deepseek-v4-flash when pro is unavailable', () => {
+    const availableModels = ['deepseek-v4-flash'];
+
+    expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-opus', availableModels)).toBe('deepseek-v4-flash');
+  });
+
   it('maps llm Claude models dynamically from the requested Claude model', () => {
     expect(resolveMappedModel('claude', 'claude-3-5-haiku')).toBe('claude-haiku-4-5-20251001');
     expect(resolveMappedModel('claude', 'claude-3-opus')).toBe('claude-opus-4-6');
@@ -93,12 +111,15 @@ describe('strategy metadata', () => {
     expect(assessStrategy('claude', DEFAULT_CLAUDE_MODELS, 'llm').level).toBe('ready');
     expect(assessStrategy('claude-glm-5.1', ['claude-glm-5.1']).level).toBe('ready');
     expect(assessStrategy('aws', AWS_CLAUDE_MODELS).level).toBe('ready');
+    expect(assessStrategy('claude-gpt-special', ['claude-gpt-5.4-sp'], 'llm').level).toBe('ready');
+    expect(assessStrategy('deepseek-v4-beta', ['deepseek-v4-pro', 'deepseek-v4-flash'], 'llm').level).toBe('ready');
   });
 
   it('marks grouped strategies as partial when one of the required models is missing', () => {
     expect(assessStrategy('default', DEFAULT_CLAUDE_MODELS.slice(0, 2)).level).toBe('partial');
     expect(assessStrategy('claude', DEFAULT_CLAUDE_MODELS.slice(0, 2), 'llm').level).toBe('partial');
     expect(assessStrategy('aws', AWS_CLAUDE_MODELS.slice(0, 2)).level).toBe('partial');
+    expect(assessStrategy('deepseek-v4-beta', ['deepseek-v4-flash'], 'llm').level).toBe('partial');
   });
 
   it('renders service-specific availability notes', () => {
@@ -111,8 +132,8 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('claude-gpt', [])).toBe('claude-gpt');
   });
 
-  it('treats llm strategies as verified when their models are reported', () => {
-    const reportedModels = ['claude-minimax-m2.7', 'claude-glm-5.1'];
+  it('treats llm strategies as verified when Claude-family models are reported', () => {
+    const reportedModels = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6', 'claude-opus-4-6'];
 
     expect(hasExploitableModelIds(reportedModels, 'llm')).toBe(true);
     expect(assessStrategy('claude-gpt', reportedModels, 'llm').level).toBe('unavailable');
@@ -120,9 +141,11 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('claude-gpt', reportedModels, 'llm')).toBe(null);
   });
 
-  it('supports the legacy claude-gpt-5.4 alias but returns the canonical strategy id', () => {
+  it('supports legacy aliases but returns canonical strategy ids', () => {
     expect(assessStrategyLaunch('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm').ready).toBe(true);
     expect(getFallbackStrategy('claude-gpt-5.4', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt');
+    expect(assessStrategyLaunch('claude-gpt-5.4-sp', ['claude-gpt-5.4-sp'], 'llm').ready).toBe(true);
+    expect(getFallbackStrategy('claude-gpt-5.4-sp', ['claude-gpt-5.4-sp'], 'llm')).toBe('claude-gpt-special');
   });
 
   it('blocks default and aws when one of the required launch models is missing', () => {
@@ -133,6 +156,13 @@ describe('strategy metadata', () => {
     expect(defaultReadiness.missingModels).toEqual(['claude-opus-4-6']);
     expect(awsReadiness.ready).toBe(false);
     expect(awsReadiness.missingModels).toEqual(['aws-claude-opus-4-6']);
+  });
+
+  it('keeps single-model llm routes launchable when the service reports a matching model', () => {
+    const gptSpecialReadiness = assessStrategyLaunch('claude-gpt-special', ['claude-gpt-5.4-sp'], 'llm');
+
+    expect(gptSpecialReadiness.ready).toBe(true);
+    expect(gptSpecialReadiness.note).toBe('Default Claude Code launch verified on RouterLab LLM.');
   });
 
   it('uses human-readable strategy labels in the interactive selector without availability badges', () => {
@@ -152,22 +182,31 @@ describe('strategy metadata', () => {
       'claude-sonnet-4-6',
       'claude-opus-4-6',
       'claude-gpt-5.4',
-      'claude-qwen3.6-plus',
-      'claude-minimax-m2.7',
-      'claude-glm-5.1',
+      'claude-gpt-5.4-sp',
+      'deepseek-v4-pro',
+      'deepseek-v4-flash',
     ], 'llm');
 
     expect(llmChoices.map((choice) => choice.value)).toEqual([
       'claude',
       'claude-gpt',
-      'claude-qwen3.6-plus',
-      'claude-minimax-m2.7',
-      'claude-glm-5.1',
+      'claude-gpt-special',
+      'deepseek-v4-beta',
     ]);
     expect(llmChoices.find((choice) => choice.value === 'claude')).toEqual({
       name: 'Claude (Opus 4.6)',
       value: 'claude',
       description: 'Map models to claude-haiku, claude-sonnet, claude-opus.',
+    });
+    expect(llmChoices.find((choice) => choice.value === 'claude-gpt-special')).toEqual({
+      name: 'OpenAI GPT special (only gpt-5.4)',
+      value: 'claude-gpt-special',
+      description: 'Forces all requests to claude-gpt-5.4-sp.',
+    });
+    expect(llmChoices.find((choice) => choice.value === 'deepseek-v4-beta')).toEqual({
+      name: 'deepseek-v4 beta',
+      value: 'deepseek-v4-beta',
+      description: 'Opus 4.7 => deepseek-v4-pro, Sonnet 4.6 => deepseek-v4-flash, Haiku => deepseek-v4-flash.',
     });
   });
 
@@ -183,10 +222,12 @@ describe('strategy metadata', () => {
     ]);
   });
 
-  it('keeps claude-gpt available on routerlab too', () => {
+  it('keeps llm-only strategies out of routerlab', () => {
     const routerlabChoices = getStrategyChoices(['claude-gpt-5.4'], 'routerlab');
 
     expect(routerlabChoices.map((choice) => choice.value)).toContain('claude-gpt');
+    expect(routerlabChoices.map((choice) => choice.value)).not.toContain('claude-gpt-special');
+    expect(routerlabChoices.map((choice) => choice.value)).not.toContain('deepseek-v4-beta');
   });
 
   it('falls back to default only when a strategy is unavailable', () => {
@@ -204,7 +245,8 @@ describe('strategy metadata', () => {
     expect(getFallbackStrategy('aws', null)).toBe('aws');
     expect(getFallbackStrategy('claude-gpt', ['claude-gpt-5.4'], 'routerlab')).toBe('claude-gpt');
     expect(getFallbackStrategy('claude-gpt', ['claude-gpt-5.4'], 'llm')).toBe('claude-gpt');
-    expect(getFallbackStrategy('claude-qwen3.6-plus', ['claude-qwen3.6-plus'], 'llm')).toBe('claude-qwen3.6-plus');
+    expect(getFallbackStrategy('claude-gpt-special', ['claude-gpt-5.4-sp'], 'llm')).toBe('claude-gpt-special');
+    expect(getFallbackStrategy('deepseek-v4-beta', ['deepseek-v4-pro', 'deepseek-v4-flash'], 'llm')).toBe('deepseek-v4-beta');
   });
 });
 
@@ -258,9 +300,8 @@ describe('wrapper validation helpers', () => {
 describe('entrypoint detection', () => {
   it('normalizes relative Windows-style script paths to the same file', () => {
     const absolute = path.resolve('index.js');
-    const relative = path.relative(process.cwd(), absolute) || 'index.js';
-    const windowsRelative = relative.split(path.sep).join('\\');
+    const relative = path.join('.', 'index.js');
 
-    expect(normalizeEntrypointPath(windowsRelative)).toBe(normalizeEntrypointPath(absolute));
+    expect(normalizeEntrypointPath(relative)).toBe(normalizeEntrypointPath(absolute));
   });
 });
