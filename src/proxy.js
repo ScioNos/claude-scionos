@@ -78,10 +78,10 @@ function getPreferredClaudeModel(requestedModel = '') {
 
 function getPreferredDeepseekV4Model(requestedModel = '') {
   if (requestedModel.includes('opus')) {
-    return 'deepseek-v4-pro';
+    return 'claude-deepseek-v4-pro';
   }
 
-  return 'deepseek-v4-flash';
+  return 'claude-deepseek-v4-flash';
 }
 
 function resolveMappedModel(targetModel, requestedModel = '', availableModels = []) {
@@ -113,7 +113,7 @@ function resolveMappedModel(targetModel, requestedModel = '', availableModels = 
   if (targetModel === 'deepseek-v4-beta') {
     const preferredModel = getPreferredDeepseekV4Model(requestedModel);
     const availableDeepseekModels = Array.isArray(availableModels)
-      ? availableModels.filter((model) => model === 'deepseek-v4-pro' || model === 'deepseek-v4-flash')
+      ? availableModels.filter((model) => model === 'claude-deepseek-v4-pro' || model === 'claude-deepseek-v4-flash')
       : [];
 
     if (availableDeepseekModels.length === 0) {
@@ -125,7 +125,7 @@ function resolveMappedModel(targetModel, requestedModel = '', availableModels = 
     }
 
     return (
-      availableDeepseekModels.find((model) => model === 'deepseek-v4-flash')
+      availableDeepseekModels.find((model) => model === 'claude-deepseek-v4-flash')
       ?? availableDeepseekModels[0]
       ?? preferredModel
     );

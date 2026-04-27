@@ -78,7 +78,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Summarize this repo"
 - `claude-gpt`: map Claude requests to the `claude-gpt` family
   `claude-gpt-5.5 ==> claude-opus-4.7`, `claude-gpt-5.4 ==> claude-sonnet-4.6`, `claude-gpt-5.4-mini ==> claude-gpt-5.4-mini`
 - `claude-gpt-special`: on `--service llm`, force all requests to `claude-gpt-5.4-sp`
-- `deepseek-v4-beta`: on `--service llm`, map Claude requests to `deepseek-v4-pro` for opus and `deepseek-v4-flash` for sonnet or haiku
+- `deepseek-v4-beta`: on `--service llm`, map Claude requests to `claude-deepseek-v4-pro` for opus and `claude-deepseek-v4-flash` for sonnet or haiku
 - `claude-qwen3.6-plus`: force all requests to `claude-qwen3.6-plus`
 - `claude-minimax-m2.7`: force all requests to `claude-minimax-m2.7`
 - `claude-glm-5.1`: force all requests to `claude-glm-5.1`
