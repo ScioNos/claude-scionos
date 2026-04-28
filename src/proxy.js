@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {Transform} from 'node:stream';
 import {BASE_URL, DEFAULT_ANTHROPIC_VERSION} from './routerlab.js';
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -16,6 +17,8 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 const PROXY_AUTH_HEADER = 'x-scionos-proxy-secret';
 const MESSAGES_PATH = '/v1/messages';
+const REASONING_CONTENT_BLOCK_TYPES = new Set(['thinking', 'redacted_thinking']);
+const REASONING_DELTA_TYPES = new Set(['thinking_delta', 'signature_delta']);
 
 function normalizeProxyHeaders(headers) {
   const normalizedHeaders = {};
@@ -33,8 +36,9 @@ function normalizeProxyHeaders(headers) {
 
 function buildProxyRequestOptions(url, method, upstreamHeaders, validToken, bodyLength, timeout) {
   const headers = normalizeProxyHeaders(upstreamHeaders);
-  delete headers.authorization;
-  delete headers[PROXY_AUTH_HEADER];
+  deleteHeader(headers, 'authorization');
+  deleteHeader(headers, PROXY_AUTH_HEADER);
+  deleteHeader(headers, 'accept-encoding');
   headers['x-api-key'] = validToken;
   headers['anthropic-version'] ??= DEFAULT_ANTHROPIC_VERSION;
 
@@ -50,6 +54,66 @@ function buildProxyRequestOptions(url, method, upstreamHeaders, validToken, body
     headers,
     timeout,
   };
+}
+
+function deleteHeader(headers, headerName) {
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === headerName.toLowerCase()) {
+      delete headers[key];
+    }
+  }
+}
+
+function isReasoningContentBlock(block) {
+  return REASONING_CONTENT_BLOCK_TYPES.has(block?.type);
+}
+
+function sanitizeContentBlocks(content) {
+  if (!Array.isArray(content)) {
+    return {content, changed: false};
+  }
+
+  const sanitized = content.filter((block) => !isReasoningContentBlock(block));
+  return {
+    content: sanitized,
+    changed: sanitized.length !== content.length,
+  };
+}
+
+function sanitizeAnthropicCompatiblePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return {payload, changed: false};
+  }
+
+  let changed = false;
+  const sanitizedPayload = {...payload};
+
+  if (Array.isArray(payload.content)) {
+    const sanitizedContent = sanitizeContentBlocks(payload.content);
+    sanitizedPayload.content = sanitizedContent.content;
+    changed ||= sanitizedContent.changed;
+  }
+
+  if (Array.isArray(payload.messages)) {
+    sanitizedPayload.messages = payload.messages.map((message) => {
+      if (!message || typeof message !== 'object') {
+        return message;
+      }
+
+      const sanitizedContent = sanitizeContentBlocks(message.content);
+      if (!sanitizedContent.changed) {
+        return message;
+      }
+
+      changed = true;
+      return {
+        ...message,
+        content: sanitizedContent.content,
+      };
+    });
+  }
+
+  return {payload: changed ? sanitizedPayload : payload, changed};
 }
 
 function getPreferredClaudeGptModel(requestedModel = '') {
@@ -77,7 +141,7 @@ function getPreferredClaudeModel(requestedModel = '') {
 }
 
 function getPreferredDeepseekV4Model(requestedModel = '') {
-  if (requestedModel.includes('opus')) {
+  if (requestedModel.includes('opus') || requestedModel.includes('sonnet')) {
     return 'claude-deepseek-v4-pro';
   }
 
@@ -233,6 +297,10 @@ async function handleMessageRequest(req, res, options) {
         bodyJson.model = newModel;
       }
 
+      if (bodyJson) {
+        bodyJson = sanitizeAnthropicCompatiblePayload(bodyJson).payload;
+      }
+
       const payload = bodyJson ? JSON.stringify(bodyJson) : bodyBuffer;
       await forwardRequest(req, res, {
         baseUrl,
@@ -274,8 +342,7 @@ async function forwardRequest(req, res, options) {
       onDebug(`[Proxy] Upstream response status: ${proxyRes.statusCode}`);
     }
 
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
+    handleProxyResponse(proxyRes, res, {debug, onDebug, onError});
   });
 
   proxyReq.on('error', (error) => {
@@ -315,6 +382,218 @@ async function forwardRequest(req, res, options) {
   } else {
     proxyReq.end();
   }
+}
+
+function handleProxyResponse(proxyRes, res, options = {}) {
+  const contentType = String(proxyRes.headers['content-type'] ?? '');
+  const contentEncoding = String(proxyRes.headers['content-encoding'] ?? '');
+
+  if (contentEncoding && contentEncoding !== 'identity') {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+    return;
+  }
+
+  if (contentType.includes('text/event-stream')) {
+    const headers = normalizeProxyHeaders(proxyRes.headers);
+    deleteHeader(headers, 'content-length');
+    deleteHeader(headers, 'content-encoding');
+    res.writeHead(proxyRes.statusCode, headers);
+    proxyRes.pipe(createAnthropicSseSanitizer(options)).pipe(res);
+    return;
+  }
+
+  if (!contentType.includes('application/json')) {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+    return;
+  }
+
+  const chunks = [];
+  proxyRes.on('data', (chunk) => chunks.push(chunk));
+  proxyRes.on('end', () => {
+    const bodyBuffer = Buffer.concat(chunks);
+    let bodyText = bodyBuffer.toString('utf8');
+
+    try {
+      const parsed = JSON.parse(bodyText);
+      const sanitized = sanitizeAnthropicCompatiblePayload(parsed);
+      if (sanitized.changed) {
+        bodyText = JSON.stringify(sanitized.payload);
+        if (options.debug) {
+          options.onDebug('[Proxy] Removed upstream reasoning content blocks from JSON response');
+        }
+      }
+    } catch {
+      bodyText = bodyBuffer.toString('utf8');
+    }
+
+    const headers = normalizeProxyHeaders(proxyRes.headers);
+    deleteHeader(headers, 'content-length');
+    deleteHeader(headers, 'content-encoding');
+    headers['content-length'] = String(Buffer.byteLength(bodyText));
+    res.writeHead(proxyRes.statusCode, headers);
+    res.end(bodyText);
+  });
+
+  proxyRes.on('error', (error) => {
+    options.onError?.(`[Proxy Error] Upstream response read failed: ${error.message}`);
+    res.destroy(error);
+  });
+}
+
+function createAnthropicSseSanitizer(options = {}) {
+  const state = {
+    droppedIndexes: new Set(),
+    indexMap: new Map(),
+    loggedReasoningRemoval: false,
+    nextIndex: 0,
+  };
+  let pending = '';
+
+  return new Transform({
+    transform(chunk, _encoding, callback) {
+      pending += chunk.toString('utf8');
+      const events = pending.split(/\r?\n\r?\n/);
+      pending = events.pop() ?? '';
+
+      for (const eventText of events) {
+        const sanitized = sanitizeSseEvent(eventText, state, options);
+        if (sanitized) {
+          this.push(`${sanitized}\n\n`);
+        }
+      }
+
+      callback();
+    },
+    flush(callback) {
+      const sanitized = sanitizeSseEvent(pending, state, options);
+      if (sanitized) {
+        this.push(`${sanitized}\n\n`);
+      }
+
+      callback();
+    },
+  });
+}
+
+function sanitizeSseEvent(eventText, state, options = {}) {
+  if (!eventText.trim()) {
+    return '';
+  }
+
+  const lines = eventText.split(/\r?\n/);
+  const dataLines = lines.filter((line) => line.startsWith('data:'));
+
+  if (dataLines.length === 0) {
+    return eventText;
+  }
+
+  const data = dataLines.map((line) => line.slice(5).trimStart()).join('\n');
+  if (data === '[DONE]') {
+    return eventText;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return eventText;
+  }
+
+  const sanitized = sanitizeAnthropicStreamEvent(parsed, state);
+  if (!sanitized) {
+    if (options.debug && !state.loggedReasoningRemoval) {
+      options.onDebug('[Proxy] Removed upstream reasoning content block from stream response');
+      state.loggedReasoningRemoval = true;
+    }
+    return '';
+  }
+
+  const outputLines = [];
+  let wroteData = false;
+  for (const line of lines) {
+    if (line.startsWith('data:')) {
+      if (!wroteData) {
+        outputLines.push(`data: ${JSON.stringify(sanitized)}`);
+        wroteData = true;
+      }
+      continue;
+    }
+
+    outputLines.push(line);
+  }
+
+  return outputLines.join('\n');
+}
+
+function sanitizeAnthropicStreamEvent(event, state) {
+  if (!event || typeof event !== 'object') {
+    return event;
+  }
+
+  if (event.type === 'message_start' && Array.isArray(event.message?.content)) {
+    initializeStreamContentIndexMap(event.message.content, state);
+    const sanitized = sanitizeAnthropicCompatiblePayload(event.message);
+    return sanitized.changed ? {...event, message: sanitized.payload} : event;
+  }
+
+  if (event.type === 'content_block_start') {
+    const originalIndex = event.index;
+
+    if (isReasoningContentBlock(event.content_block)) {
+      state.droppedIndexes.add(originalIndex);
+      return null;
+    }
+
+    const mappedIndex = getOrCreateMappedContentIndex(originalIndex, state);
+    return {...event, index: mappedIndex};
+  }
+
+  if (event.type === 'content_block_delta' || event.type === 'content_block_stop') {
+    const originalIndex = event.index;
+    if (state.droppedIndexes.has(originalIndex)) {
+      return null;
+    }
+
+    if (REASONING_DELTA_TYPES.has(event.delta?.type)) {
+      state.droppedIndexes.add(originalIndex);
+      return null;
+    }
+
+    if (!state.indexMap.has(originalIndex)) {
+      return event;
+    }
+
+    return {...event, index: state.indexMap.get(originalIndex)};
+  }
+
+  return event;
+}
+
+function initializeStreamContentIndexMap(content, state) {
+  for (const [originalIndex, block] of content.entries()) {
+    if (state.droppedIndexes.has(originalIndex) || state.indexMap.has(originalIndex)) {
+      continue;
+    }
+
+    if (isReasoningContentBlock(block)) {
+      state.droppedIndexes.add(originalIndex);
+      continue;
+    }
+
+    state.indexMap.set(originalIndex, state.nextIndex);
+    state.nextIndex += 1;
+  }
+}
+
+function getOrCreateMappedContentIndex(originalIndex, state) {
+  if (!state.indexMap.has(originalIndex)) {
+    state.indexMap.set(originalIndex, state.nextIndex);
+    state.nextIndex += 1;
+  }
+
+  return state.indexMap.get(originalIndex);
 }
 
 function startProxyServer(targetModel, validToken, options = {}) {
@@ -364,5 +643,7 @@ export {
   normalizeProxyHeaders,
   PROXY_AUTH_HEADER,
   resolveMappedModel,
+  sanitizeAnthropicCompatiblePayload,
+  sanitizeAnthropicStreamEvent,
   startProxyServer,
 };

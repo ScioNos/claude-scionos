@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import { assessStrategy, assessStrategyLaunch, DEFAULT_CLAUDE_MODELS, AWS_CLAUDE_MODELS, getFallbackStrategy, getServiceConfig, getStrategyChoices, hasExploitableModelIds, resolveServiceBaseUrl, validateTokenFormat } from '../src/routerlab.js';
-import { buildProxyRequestOptions, normalizeProxyHeaders, PROXY_AUTH_HEADER, resolveMappedModel } from '../src/proxy.js';
+import { buildProxyRequestOptions, normalizeProxyHeaders, PROXY_AUTH_HEADER, resolveMappedModel, sanitizeAnthropicCompatiblePayload, sanitizeAnthropicStreamEvent } from '../src/proxy.js';
 import { normalizeEntrypointPath, resolveLaunchToken } from '../index.js';
 
 describe('proxy request handling', () => {
@@ -47,6 +47,146 @@ describe('proxy request handling', () => {
     });
   });
 
+  it('removes MiniMax reasoning blocks from JSON responses', () => {
+    const response = {
+      id: 'msg_123',
+      type: 'message',
+      role: 'assistant',
+      content: [
+        {
+          type: 'thinking',
+          thinking: 'private chain of thought',
+          signature: 'signature',
+        },
+        {
+          type: 'tool_use',
+          id: 'call_1',
+          name: 'get_time',
+          input: {city: 'Paris'},
+        },
+      ],
+      stop_reason: 'tool_use',
+    };
+
+    expect(sanitizeAnthropicCompatiblePayload(response)).toEqual({
+      payload: {
+        ...response,
+        content: [
+          {
+            type: 'tool_use',
+            id: 'call_1',
+            name: 'get_time',
+            input: {city: 'Paris'},
+          },
+        ],
+      },
+      changed: true,
+    });
+  });
+
+  it('removes prior reasoning blocks from request history', () => {
+    const request = {
+      model: 'claude-minimax-m2.7',
+      messages: [
+        {
+          role: 'assistant',
+          content: [
+            {type: 'thinking', thinking: 'private chain of thought', signature: 'signature'},
+            {type: 'text', text: 'ok'},
+          ],
+        },
+      ],
+    };
+
+    expect(sanitizeAnthropicCompatiblePayload(request).payload.messages[0].content).toEqual([
+      {type: 'text', text: 'ok'},
+    ]);
+  });
+
+  it('drops reasoning stream events and renumbers following content blocks', () => {
+    const state = {
+      droppedIndexes: new Set(),
+      indexMap: new Map(),
+      nextIndex: 0,
+    };
+
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'content_block_start',
+      index: 0,
+      content_block: {type: 'thinking', thinking: ''},
+    }, state)).toBeNull();
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {type: 'thinking_delta', thinking: 'private chain of thought'},
+    }, state)).toBeNull();
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'content_block_start',
+      index: 1,
+      content_block: {type: 'tool_use', id: 'call_1', name: 'get_time', input: {}},
+    }, state)).toEqual({
+      type: 'content_block_start',
+      index: 0,
+      content_block: {type: 'tool_use', id: 'call_1', name: 'get_time', input: {}},
+    });
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'content_block_delta',
+      index: 1,
+      delta: {type: 'input_json_delta', partial_json: '{"city":"Paris"}'},
+    }, state)).toEqual({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {type: 'input_json_delta', partial_json: '{"city":"Paris"}'},
+    });
+  });
+
+  it('keeps stream indexes consistent when message_start already contains content', () => {
+    const state = {
+      droppedIndexes: new Set(),
+      indexMap: new Map(),
+      nextIndex: 0,
+    };
+
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'message_start',
+      message: {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [
+          {type: 'thinking', thinking: 'private chain of thought', signature: 'signature'},
+          {type: 'tool_use', id: 'call_1', name: 'Bash', input: {}},
+        ],
+      },
+    }, state)).toEqual({
+      type: 'message_start',
+      message: {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [
+          {type: 'tool_use', id: 'call_1', name: 'Bash', input: {}},
+        ],
+      },
+    });
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'content_block_delta',
+      index: 1,
+      delta: {type: 'input_json_delta', partial_json: '{"command":"git status"}'},
+    }, state)).toEqual({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {type: 'input_json_delta', partial_json: '{"command":"git status"}'},
+    });
+    expect(sanitizeAnthropicStreamEvent({
+      type: 'content_block_stop',
+      index: 1,
+    }, state)).toEqual({
+      type: 'content_block_stop',
+      index: 0,
+    });
+  });
+
   it('maps AWS models dynamically from the requested Claude model', () => {
     expect(resolveMappedModel('aws', 'claude-3-5-haiku')).toBe('aws-claude-haiku-4-5-20251001');
     expect(resolveMappedModel('aws', 'claude-3-opus')).toBe('aws-claude-opus-4-6');
@@ -69,7 +209,7 @@ describe('proxy request handling', () => {
   it('maps deepseek-v4 beta from the requested Claude model', () => {
     expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-5-haiku')).toBe('claude-deepseek-v4-flash');
     expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-opus')).toBe('claude-deepseek-v4-pro');
-    expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-7-sonnet')).toBe('claude-deepseek-v4-flash');
+    expect(resolveMappedModel('deepseek-v4-beta', 'claude-3-7-sonnet')).toBe('claude-deepseek-v4-pro');
   });
 
   it('falls back to deepseek-v4-flash when pro is unavailable', () => {
@@ -206,7 +346,7 @@ describe('strategy metadata', () => {
     expect(llmChoices.find((choice) => choice.value === 'deepseek-v4-beta')).toEqual({
       name: 'deepseek-v4 beta',
       value: 'deepseek-v4-beta',
-      description: 'Opus 4.7 => claude-deepseek-v4-pro, Sonnet 4.6 => claude-deepseek-v4-flash, Haiku => claude-deepseek-v4-flash.',
+      description: 'Opus 4.7 => claude-deepseek-v4-pro, Sonnet 4.6 => claude-deepseek-v4-pro, Haiku => claude-deepseek-v4-flash.',
     });
   });
 

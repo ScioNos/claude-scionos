@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-04-28
+
+### Fixed
+- **MiniMax Anthropic Compatibility**: Strip upstream `thinking` and `redacted_thinking` content blocks from proxied message payloads so Claude Code does not receive unsupported reasoning blocks.
+- **Streaming Tool Use**: Renumber streamed content block indexes after reasoning blocks are removed, including streams where `message_start` already contains content, fixing `Content block not found` errors during tool use.
+
+### Changed
+- **DeepSeek Sonnet Routing**: Route Sonnet requests through `claude-deepseek-v4-pro` for the invitation-only `llm` `deepseek-v4-beta` strategy. Haiku continues to use `claude-deepseek-v4-flash`.
+- **Versioning**: Bumped the published package metadata to `4.4.0`.
+
 ## [4.3.5] - 2026-04-27
 
 ### Fixed

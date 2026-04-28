@@ -114,8 +114,8 @@ const STRATEGIES = [
     value: 'deepseek-v4-beta',
     name: 'deepseek-v4 beta',
     selectionName: 'deepseek-v4 beta',
-    description: 'Maps Claude requests to the deepseek-v4 family. Opus 4.7 => claude-deepseek-v4-pro, Sonnet 4.6 => claude-deepseek-v4-flash, Haiku => claude-deepseek-v4-flash.',
-    selectionDescription: 'Opus 4.7 => claude-deepseek-v4-pro, Sonnet 4.6 => claude-deepseek-v4-flash, Haiku => claude-deepseek-v4-flash.',
+    description: 'Maps Claude requests to the deepseek-v4 family. Opus 4.7 => claude-deepseek-v4-pro, Sonnet 4.6 => claude-deepseek-v4-pro, Haiku => claude-deepseek-v4-flash.',
+    selectionDescription: 'Opus 4.7 => claude-deepseek-v4-pro, Sonnet 4.6 => claude-deepseek-v4-pro, Haiku => claude-deepseek-v4-flash.',
     verificationModels: ['claude-deepseek-v4-pro', 'claude-deepseek-v4-flash'],
   },
   {

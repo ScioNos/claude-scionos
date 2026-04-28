@@ -78,7 +78,7 @@ npx claude-scionos --strategy aws --no-prompt -p "Résume ce dépôt"
 - `claude-gpt` : mappe les requêtes Claude vers la famille `claude-gpt`
   `claude-gpt-5.5 ==> claude-opus-4.7`, `claude-gpt-5.4 ==> claude-sonnet-4.6`, `claude-gpt-5.4-mini ==> claude-gpt-5.4-mini`
 - `claude-gpt-special` : sur `--service llm`, force toutes les requêtes vers `claude-gpt-5.4-sp`
-- `deepseek-v4-beta` : sur `--service llm`, mappe les requêtes Claude vers `claude-deepseek-v4-pro` pour opus et `claude-deepseek-v4-flash` pour sonnet ou haiku
+- `deepseek-v4-beta` : sur `--service llm`, mappe les requêtes Claude vers `claude-deepseek-v4-pro` pour opus ou sonnet et `claude-deepseek-v4-flash` pour haiku
 - `claude-qwen3.6-plus` : force toutes les requêtes vers `claude-qwen3.6-plus`
 - `claude-minimax-m2.7` : force toutes les requêtes vers `claude-minimax-m2.7`
 - `claude-glm-5.1` : force toutes les requêtes vers `claude-glm-5.1`
